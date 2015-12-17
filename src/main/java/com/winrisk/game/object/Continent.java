@@ -10,11 +10,9 @@ public class Continent implements Serializable {
 
     private static final long serialVersionUID = -755509907464278869L;
     private final int colorNo;
-
-    private int bonus;
-
     private final Color color;
     private final FieldList fields;
+    private int bonus;
 
     public Continent(int color, int bonus) {
         this.bonus = bonus;

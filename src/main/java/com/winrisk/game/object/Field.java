@@ -12,13 +12,12 @@ import java.util.stream.Collectors;
 
 public class Field implements Serializable {
     private static final long serialVersionUID = -6700279861283808361L;
+    private final FieldList next;
+    private final PointF point;
     private int army;
     private Continent continent;
     private transient int min = 0;
-    private final FieldList next;
     private Player player;
-
-    private final PointF point;
 
     public Field(PointF point) {
         this.point = point;
@@ -157,8 +156,25 @@ public class Field implements Serializable {
         return army;
     }
 
+    public void setArmy(int army) {
+        this.army = army;
+    }
+
     public Continent getContinent() {
         return continent;
+    }
+
+    public void setContinent(Continent con) {
+        if (continent == con) {
+            return;
+        }
+        if (continent != null) {
+            continent.removeField(this);
+        }
+        this.continent = con;
+        if (continent != null) {
+            continent.addField(this);
+        }
     }
 
     public FieldList getEnemy() {
@@ -195,6 +211,10 @@ public class Field implements Serializable {
 
     public Player getPlayer() {
         return player;
+    }
+
+    public void setPlayer(Player player) {
+        this.player = player;
     }
 
     public PointF getPoint() {
@@ -262,29 +282,8 @@ public class Field implements Serializable {
         }
     }
 
-    public void setArmy(int army) {
-        this.army = army;
-    }
-
-    public void setContinent(Continent con) {
-        if (continent == con) {
-            return;
-        }
-        if (continent != null) {
-            continent.removeField(this);
-        }
-        this.continent = con;
-        if (continent != null) {
-            continent.addField(this);
-        }
-    }
-
     public void setMin() {
         min = army;
-    }
-
-    public void setPlayer(Player player) {
-        this.player = player;
     }
 
 }

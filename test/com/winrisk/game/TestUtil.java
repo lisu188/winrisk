@@ -9,7 +9,6 @@ import com.winrisk.game.serialization.MapSketch;
 import com.winrisk.game.view.Game;
 import org.junit.Test;
 
-import java.io.*;
 import java.lang.reflect.Field;
 import java.util.Base64;
 import java.util.zip.DataFormatException;
@@ -37,14 +36,6 @@ public class TestUtil {
             game.next();
         }
         return game;
-    }
-
-    @Test
-    public void serialization() throws Exception {
-        MapSketch game = createNewGame().getMapSketch();
-        String serializedGame = serialize(game);
-        MapSketch newGame = deserialize(serializedGame, MapSketch.class);
-        assert (game.equals(newGame));
     }
 
     public static <T> T getField(Object object, String field, Class<T> fieldClass) throws NoSuchFieldException, IllegalAccessException {
@@ -102,6 +93,14 @@ public class TestUtil {
         inflater.end();
 
         return output;
+    }
+
+    @Test
+    public void serialization() throws Exception {
+        MapSketch game = createNewGame().getMapSketch();
+        String serializedGame = serialize(game);
+        MapSketch newGame = deserialize(serializedGame, MapSketch.class);
+        assert (game.equals(newGame));
     }
 
 }

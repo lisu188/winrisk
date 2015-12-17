@@ -17,11 +17,9 @@ import com.winrisk.game.util.PointF;
 import java.util.Random;
 
 public class Game implements FieldListener, Viewable {
-    private int curPlayer;
-
-    private GamePhase curState;
     private final FieldDetector fieldDetector = new FieldDetector(this);
-
+    private int curPlayer;
+    private GamePhase curState;
     private Map map = new Map();
 
     private Params params = new Params();
@@ -48,6 +46,10 @@ public class Game implements FieldListener, Viewable {
         return curPlayer;
     }
 
+    public void setCurPlayer(int curPlayer) {
+        this.curPlayer = curPlayer;
+    }
+
     @Override
     public FieldList getFieldList() {
         return map.getFields();
@@ -61,6 +63,11 @@ public class Game implements FieldListener, Viewable {
         return map;
     }
 
+    public void setMap(Map map) {
+        this.map = map;
+
+    }
+
     public MapSketch getMapSketch() {
         return new MapSketch(this);
     }
@@ -69,8 +76,16 @@ public class Game implements FieldListener, Viewable {
         return params;
     }
 
+    public void setParams(Params params2) {
+        this.params = params2;
+    }
+
     public GamePhase getPhase() {
         return curState;
+    }
+
+    public void setPhase(GamePhase curState) {
+        this.curState = curState;
     }
 
     public Player getPlayer() {
@@ -79,6 +94,10 @@ public class Game implements FieldListener, Viewable {
 
     public PlayerList getPlayers() {
         return players;
+    }
+
+    public void setPlayers(PlayerList players) {
+        this.players = players;
     }
 
     private void incState() {
@@ -242,27 +261,6 @@ public class Game implements FieldListener, Viewable {
     @Override
     public boolean onVoidDrag(PointF from, PointF to) {
         return true;
-    }
-
-    public void setCurPlayer(int curPlayer) {
-        this.curPlayer = curPlayer;
-    }
-
-    public void setMap(Map map) {
-        this.map = map;
-
-    }
-
-    public void setParams(Params params2) {
-        this.params = params2;
-    }
-
-    public void setPhase(GamePhase curState) {
-        this.curState = curState;
-    }
-
-    public void setPlayers(PlayerList players) {
-        this.players = players;
     }
 
     private void startNewGame() {

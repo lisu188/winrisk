@@ -34,7 +34,7 @@ public class ContinentAI implements PlayerInterface {
             FieldList fieldsToAttack = game.getFields().stream().filter(f -> !playerFields.equals(f.getPlayer())).sorted((f1, f2) -> Float.compare(getAverageProximity(game, f1, goalFields), getAverageProximity(game, f2, goalFields))).collect(Collectors.toCollection(FieldList::new));
             playerFields.forEach(playerField ->
                     fieldsToAttack.forEach(attackField ->
-                                    playerField.fight(attackField, game)
+                            playerField.fight(attackField, game)
                     ));
         }
     }

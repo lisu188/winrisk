@@ -17,11 +17,8 @@ public class Map implements Saveable {
     private final ContinentList continents = new ContinentList();
 
     private final FieldList fields = new FieldList();
-
-    private byte[] image;
-
     private final Serializer serializer = new JavaSerializer();
-
+    private byte[] image;
     private int[][] proxCache;
 
     public Map() {
@@ -71,6 +68,10 @@ public class Map implements Saveable {
         return image;
     }
 
+    public void setImage(byte[] image) {
+        this.image = image;
+    }
+
     @Override
     public Class<? extends Sketch> getSketchClass() {
         return MapSketch.class;
@@ -82,10 +83,6 @@ public class Map implements Saveable {
 
     public void save(String path) {
         serializer.save(this, path);
-    }
-
-    public void setImage(byte[] image) {
-        this.image = image;
     }
 
     @Override

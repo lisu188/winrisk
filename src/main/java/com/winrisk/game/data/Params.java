@@ -1,7 +1,6 @@
 package com.winrisk.game.data;
 
 import com.winrisk.game.ai.PlayerFactory;
-import com.winrisk.game.ai.PlayerInterface;
 import com.winrisk.game.map.Map;
 
 import java.io.Serializable;
@@ -18,6 +17,10 @@ public class Params implements Serializable {
     private transient String map;
 
     private boolean skynetMode;
+    private AiFactory aiFactory = i -> PlayerFactory.getRandomAI();
+
+    public Params() {
+    }
 
     public AiFactory getAiFactory() {
         return aiFactory;
@@ -27,17 +30,20 @@ public class Params implements Serializable {
         this.aiFactory = aiFactory;
     }
 
-    private AiFactory aiFactory= i -> PlayerFactory.getRandomAI();
-
-    public Params() {
-    }
-
     public int getAiPlayers() {
         return aiPlayers;
     }
 
+    public void setAiPlayers(int aiPlayers) {
+        this.aiPlayers = aiPlayers;
+    }
+
     public int getHumanPlayers() {
         return humanPlayers;
+    }
+
+    public void setHumanPlayers(int humanPlayers) {
+        this.humanPlayers = humanPlayers;
     }
 
     public Map loadMap() {
@@ -48,35 +54,27 @@ public class Params implements Serializable {
         return attackWithAll;
     }
 
-    public boolean isFogOfWar() {
-        return fogOfWar;
-    }
-
-    public boolean isSkynetMode() {
-        return skynetMode;
-    }
-
-    public void setAiPlayers(int aiPlayers) {
-        this.aiPlayers = aiPlayers;
-    }
-
-    public void setHumanPlayers(int humanPlayers) {
-        this.humanPlayers = humanPlayers;
-    }
-
     public void setAttackWithAll(boolean attackWithAll) {
         this.attackWithAll = attackWithAll;
+    }
+
+    public boolean isFogOfWar() {
+        return fogOfWar;
     }
 
     public void setFogOfWar(boolean fogOfWar) {
         this.fogOfWar = fogOfWar;
     }
 
-    public void setMap(String map) {
-        this.map = map;
+    public boolean isSkynetMode() {
+        return skynetMode;
     }
 
     public void setSkynetMode(boolean skynetMode) {
         this.skynetMode = skynetMode;
+    }
+
+    public void setMap(String map) {
+        this.map = map;
     }
 }

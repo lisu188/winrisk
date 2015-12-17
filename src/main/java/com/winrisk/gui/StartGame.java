@@ -14,10 +14,6 @@ import java.io.IOException;
 
 public class StartGame extends JFrame {
 
-    public static void main(String[] args) {
-        new StartGame().setVisible(true);
-    }
-
     public StartGame() {
         setTitle("WinRisk");
         setResizable(false);
@@ -66,6 +62,10 @@ public class StartGame extends JFrame {
         contentPane.add(buttonHostGame);
         contentPane.add(btnNewMap);
         contentPane.add(button);
+    }
+
+    public static void main(String[] args) {
+        new StartGame().setVisible(true);
     }
 
     private Map createEmptyMap(String imagePath) throws IOException {

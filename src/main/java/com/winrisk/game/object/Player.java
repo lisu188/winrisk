@@ -12,13 +12,10 @@ import java.util.stream.Collectors;
 
 public class Player {
 
-    private int[] cards;
-
-    private Color color;
-
-    private boolean conq;
-
     private final PlayerInterface playerInterface;
+    private int[] cards;
+    private Color color;
+    private boolean conq;
     private int rein;
 
     public Player(Color color2, PlayerInterface ifc) {
