@@ -1,14 +1,13 @@
 package com.winrisk.game;
 
 
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.serialization.MapSketch;
 import com.winrisk.game.view.Game;
 import org.junit.Test;
 
+import java.io.*;
 import java.lang.reflect.Field;
 import java.util.Base64;
 import java.util.zip.DataFormatException;
@@ -45,20 +44,20 @@ public class TestUtil {
     }
 
     public static String serialize(Object object) throws Exception {
-        ByteOutputStream byteOutputStream = new ByteOutputStream();
+        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
         ObjectOutputStream stream = new ObjectOutputStream(byteOutputStream);
         stream.writeObject(object);
-        return Base64.getEncoder().encodeToString(compress(byteOutputStream.getBytes()));
+        return Base64.getEncoder().encodeToString(compress(byteOutputStream.toByteArray()));
     }
 
     public static <T> T deserialize(String data, Class<T> clas) throws Exception {
         byte[] decompress = decompress(Base64.getDecoder().decode(data));
-        ByteInputStream byteOutputStream = new ByteInputStream(decompress, decompress.length);
+        ByteArrayInputStream byteOutputStream = new ByteArrayInputStream(decompress, 0, decompress.length);
         ObjectInputStream stream = new ObjectInputStream(byteOutputStream);
         return (T) stream.readObject();
     }
 
-    private static byte[] compress(byte[] data) throws IOException, IOException {
+    private static byte[] compress(byte[] data) throws IOException {
         Deflater deflater = new Deflater();
         deflater.setInput(data);
 
