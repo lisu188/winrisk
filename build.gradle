@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'jacoco'
+    id 'application'
 }
 
 group = 'WinRisk'
@@ -45,4 +46,18 @@ jacocoTestCoverageVerification {
 test {
     useJUnit()
     finalizedBy jacocoTestReport, jacocoTestCoverageVerification
+}
+
+application {
+    mainClass = 'com.winrisk.gui.StartGame'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': application.mainClass
+    }
+}
+
+tasks.named('distZip') {
+    enabled = true
 }
