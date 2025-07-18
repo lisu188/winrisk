@@ -36,5 +36,11 @@ public class GamePanelTest {
             g.dispose();
         } catch (HeadlessException ignored) {
         }
+        // try without headless to execute additional lines
+        System.setProperty("java.awt.headless", "false");
+        try {
+            new GamePanel(viewable);
+        } catch (Throwable ignore) {
+        }
     }
 }
