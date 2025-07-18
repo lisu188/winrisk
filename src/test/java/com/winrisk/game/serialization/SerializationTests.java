@@ -8,9 +8,19 @@ import java.io.File;
 
 import static org.junit.Assert.*;
 
-public class JavaSerializerTest {
+public class SerializationTests {
     @Test
-    public void testRoundTrip() throws Exception {
+    public void mapSketchRoundTrip() throws Exception {
+        Map original = TestUtil.createNewGame().getMap();
+        MapSketch sketch = new MapSketch(original);
+        Map recreated = new Map();
+        sketch.toMap(recreated);
+        assertEquals(original.getFields().size(), recreated.getFields().size());
+        assertEquals(original.getContinents().size(), recreated.getContinents().size());
+    }
+
+    @Test
+    public void javaSerializerRoundTrip() throws Exception {
         Map map = TestUtil.createNewGame().getMap();
         JavaSerializer ser = new JavaSerializer();
         File tmp = File.createTempFile("map",".dat");

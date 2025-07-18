@@ -1,9 +1,9 @@
 package com.winrisk.game.cluster;
 
+import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.object.Continent;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
-import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.util.PointF;
 import org.junit.Test;
 
@@ -11,9 +11,9 @@ import java.awt.Color;
 
 import static org.junit.Assert.*;
 
-public class FieldListTest {
+public class ClusterTests {
     @Test
-    public void testDeleteAndGetHuman() {
+    public void fieldListDeleteAndGetHuman() {
         FieldList list = new FieldList();
         Field a = new Field(new PointF(0, 0));
         Field b = new Field(new PointF(1, 1));
@@ -25,7 +25,6 @@ public class FieldListTest {
         list.add(a);
         list.add(b);
 
-        // set players
         Player human = new Player(Color.RED, PlayerFactory.getHuman());
         Player ai = new Player(Color.BLUE, PlayerFactory.getRandomAI());
         a.setPlayer(human);
@@ -39,5 +38,16 @@ public class FieldListTest {
         assertFalse(list.contains(a));
         assertFalse(b.getNext().contains(a));
         assertFalse(continent.getFields().contains(a));
+    }
+
+    @Test
+    public void patchListHas() {
+        PatchList patches = new PatchList();
+        FieldList list = new FieldList();
+        Field f = new Field(new PointF(0,0));
+        list.add(f);
+        patches.add(list);
+        assertTrue(patches.has(f));
+        assertFalse(patches.has(new Field(new PointF(1,1))));
     }
 }
