@@ -1,36 +1,47 @@
 # WinRisk
 
+WinRisk is a lightweight Java implementation of the classic world domination board game.  
+It is built with **Gradle** and uses **Swing** for the graphical interface.
 
-A simple strategy game project built with Gradle.
+## Prerequisites
+- Java 17 or newer
+- Gradle 8 (or use the provided `gradlew` wrapper)
 
-## Building the project
-
-Use Gradle to compile and package the application:
-
-```bash
-gradle jar distZip
-```
-
-This creates a runnable JAR in `build/libs` and a zipped distribution in `build/distributions`.
-Extract the ZIP to run the platform script located in the `bin` directory.
-
-## Running the game
-
-Run the packaged JAR with:
+## Build
+Compile sources and run the unit tests:
 
 ```bash
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
+gradle build
 ```
 
-Ensure a graphical environment is available since the game uses Swing.
+A coverage report is generated under `build/reports/jacoco`. The build fails
+if the coverage ratio is below the configured threshold.
 
-This project is built with Gradle. It now requires **Java 17** to compile and run.
-
-## Building
-
-Use Gradle to build and run the tests:
+## Run
+Launch the game directly from Gradle while developing:
 
 ```bash
-./gradlew build
+gradle run
 ```
+
+To create a distributable archive:
+
+```bash
+gradle distZip
+unzip build/distributions/WinRisk-*.zip
+./WinRisk-*/bin/WinRisk
+```
+
+## Tests
+Execute tests and produce coverage data separately with:
+
+```bash
+gradle test jacocoTestReport
+```
+
+## Repository Structure
+- `src/main/java` – application sources
+- `src/main/resources` – maps and images used by the game
+- `src/test/java` – JUnit tests
+- `img/` – example screenshots
 
