@@ -11,6 +11,7 @@ gradle jar distZip
 ```
 
 This creates a runnable JAR in `build/libs` and a zipped distribution in `build/distributions`.
+Extract the ZIP to run the platform script located in the `bin` directory.
 
 ## Running the game
 
