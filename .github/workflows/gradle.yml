@@ -10,11 +10,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Cache Gradle files
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build distZip
+      - name: Upload distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-distribution
+          path: build/distributions/*.zip
