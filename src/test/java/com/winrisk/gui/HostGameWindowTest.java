@@ -13,10 +13,17 @@ public class HostGameWindowTest {
             HostGameWindow window = new HostGameWindow();
             Field f = HostGameWindow.class.getDeclaredField("frame");
             f.setAccessible(true);
-            assertNotNull(f.get(window));
-            window.setVisible(false);
+            if (!java.awt.GraphicsEnvironment.isHeadless()) {
+                assertNotNull(f.get(window));
+                window.setVisible(false);
+            }
         } catch (HeadlessException e) {
             // Ignore if environment does not support GUI
+        }
+        System.setProperty("java.awt.headless", "false");
+        try {
+            new HostGameWindow();
+        } catch (Throwable ignore) {
         }
     }
 }

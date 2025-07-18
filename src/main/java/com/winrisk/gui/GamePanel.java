@@ -24,12 +24,14 @@ public class GamePanel extends JPanel {
         setMouseListener();
         setAncestorListener();
         this.viewable = viewable;
-        JFrame frame = new JFrame();
-        frame.setSize(800, 600);
-        frame.getContentPane().add(this);
-        frame.setResizable(false);
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        frame.setVisible(true);
+        if (!GraphicsEnvironment.isHeadless()) {
+            JFrame frame = new JFrame();
+            frame.setSize(800, 600);
+            frame.getContentPane().add(this);
+            frame.setResizable(false);
+            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            frame.setVisible(true);
+        }
     }
 
     @Override
