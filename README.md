@@ -1,5 +1,6 @@
 # WinRisk
 
+
 A simple strategy game project built with Gradle.
 
 ## Building the project
@@ -22,3 +23,14 @@ java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
 ```
 
 Ensure a graphical environment is available since the game uses Swing.
+
+This project is built with Gradle. It now requires **Java 17** to compile and run.
+
+## Building
+
+Use Gradle to build and run the tests:
+
+```bash
+./gradlew build
+```
+
