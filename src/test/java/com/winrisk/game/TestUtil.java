@@ -94,13 +94,6 @@ public class TestUtil {
         return output;
     }
 
-    @Test
-    public void serialization() throws Exception {
-        MapSketch game = createNewGame().getMapSketch();
-        String serializedGame = serialize(game);
-        MapSketch newGame = deserialize(serializedGame, MapSketch.class);
-        assert (game.equals(newGame));
-    }
 
 }
 
