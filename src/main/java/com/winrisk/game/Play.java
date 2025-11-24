@@ -20,6 +20,10 @@ public class Play {
 
     public Player play() {
         System.setProperty("java.awt.headless", "true");
+        if (maxTurns <= 0) {
+            throw new IllegalStateException(
+                    "Game did not finish within " + maxTurns + " turns");
+        }
         Game game = new Game(params);
         int turns = 0;
         while (!game.end()) {
