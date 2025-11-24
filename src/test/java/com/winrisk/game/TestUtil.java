@@ -31,7 +31,9 @@ public class TestUtil {
     }
 
     public static Game finishGame(Game game) {
-        while (!game.end()) {
+        int turns = 0;
+        int maxTurns = 20;
+        while (!game.end() && turns++ < maxTurns) {
             game.next();
         }
         return game;

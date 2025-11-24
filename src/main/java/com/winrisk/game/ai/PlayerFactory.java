@@ -19,6 +19,9 @@ public class PlayerFactory {
                 add(PlayerAI.class);
                 add(EasyAI.class);
                 add(ContinentAI.class);
+                add(BalancedAI.class);
+                add(BorderGuardAI.class);
+                add(RandomAI.class);
             }
         };
         AI = ALL.stream()

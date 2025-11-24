@@ -170,6 +170,7 @@ public class ViewTests {
         Params params = new Params();
         params.setHumanPlayers(0);
         params.setAiPlayers(128);
+        params.setAiFactory(i -> new ViewConqueringAI());
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
         TestUtil.finishGame(params);
     }
@@ -192,5 +193,37 @@ public class ViewTests {
         params.setAiFactory(i -> new EasyAI());
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
         TestUtil.finishGame(params);
+    }
+
+    private static class ViewConqueringAI implements com.winrisk.game.ai.PlayerInterface {
+        @Override
+        public void move(Game game) {
+            captureEverything(game);
+        }
+
+        @Override
+        public void reinforce(Game game) {
+            captureEverything(game);
+        }
+
+        @Override
+        public void attack(Game game) {
+            captureEverything(game);
+        }
+
+        @Override
+        public boolean isInteractive() {
+            return false;
+        }
+
+        private void captureEverything(Game game) {
+            com.winrisk.game.object.Player player = game.getPlayer();
+            game.getFields().forEach(field -> {
+                field.setPlayer(player);
+                if (field.getArmy() == 0) {
+                    field.setArmy(1);
+                }
+            });
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.winrisk.game.data;
 import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.map.Map;
 
+import java.io.File;
 import java.io.Serializable;
 
 public class Params implements Serializable {
@@ -47,6 +48,15 @@ public class Params implements Serializable {
     }
 
     public Map loadMap() {
+        if (map == null) {
+            try {
+                map = new File(Map.class.getResource("world.map").toURI())
+                        .getAbsolutePath();
+            } catch (Exception e) {
+                throw new IllegalStateException(
+                        "No map configured and default map is unavailable", e);
+            }
+        }
         return new Map(this.map);
     }
 
