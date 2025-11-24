@@ -7,6 +7,8 @@ import com.winrisk.game.cluster.PlayerList;
 import com.winrisk.game.data.GamePhase;
 import com.winrisk.game.data.MotionEvent;
 import com.winrisk.game.data.Params;
+import com.winrisk.game.mission.Mission;
+import com.winrisk.game.mission.MissionDeck;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
@@ -25,6 +27,8 @@ public class Game implements FieldListener, Viewable {
     private Params params = new Params();
 
     private PlayerList players;
+    private MissionDeck missionDeck;
+    private Player missionWinner;
 
     public Game(Params params) {
         this.params = params;
@@ -33,6 +37,10 @@ public class Game implements FieldListener, Viewable {
     }
 
     public boolean end() {
+        evaluateMissionWin();
+        if (missionWinner != null) {
+            return true;
+        }
         int alive = 0;
         for (Player player : players) {
             if (!player.isDead(this)) {
@@ -100,6 +108,20 @@ public class Game implements FieldListener, Viewable {
         this.players = players;
     }
 
+    public Player getMissionWinner() {
+        return missionWinner;
+    }
+
+    public Player getWinner() {
+        if (missionWinner != null) {
+            return missionWinner;
+        }
+        return players.stream()
+                .filter(player -> !player.isDead(this))
+                .findFirst()
+                .orElse(null);
+    }
+
     private void incState() {
         curState = curState.getNextState();
         if (curState == GamePhase.REINFORCE) {
@@ -134,6 +156,28 @@ public class Game implements FieldListener, Viewable {
                 ifc = params.getAiFactory().getAi(i);
             }
             players.add(new Player(Colors.get(i), ifc));
+        }
+    }
+
+    private void assignMissions() {
+        missionDeck = new MissionDeck(map, players);
+        for (Player player : players) {
+            Mission mission = missionDeck.draw(player);
+            player.setMission(mission);
+        }
+    }
+
+    private void evaluateMissionWin() {
+        if (missionWinner != null) {
+            return;
+        }
+        for (Player player : players) {
+            Mission mission = player.getMission();
+            if ((mission != null) && !player.isDead(this)
+                    && mission.isCompleted(this, player)) {
+                missionWinner = player;
+                break;
+            }
         }
     }
 
@@ -266,6 +310,7 @@ public class Game implements FieldListener, Viewable {
     private void startNewGame() {
         initPlayers();
         initFields();
+        assignMissions();
         curPlayer = -1;
         curState = GamePhase.UNDEFINED;
         incState();

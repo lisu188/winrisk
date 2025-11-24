@@ -4,8 +4,6 @@ import com.winrisk.game.data.Params;
 import com.winrisk.game.object.Player;
 import com.winrisk.game.view.Game;
 
-import java.util.Optional;
-
 public class Play {
 
     private final Params params;
@@ -46,11 +44,7 @@ public class Play {
     }
 
     private Player getWinner(Game game) {
-        Optional<Player> winner = game.getPlayers()
-                .stream()
-                .filter(player -> !player.isDead(game))
-                .findFirst();
-        return winner.orElse(null);
+        return game.getWinner();
     }
 
     public static void main(String[] args) {
