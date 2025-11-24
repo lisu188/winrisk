@@ -4,6 +4,7 @@ import com.winrisk.game.ai.PlayerInterface;
 import com.winrisk.game.cluster.ContinentList;
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PatchList;
+import com.winrisk.game.mission.Mission;
 import com.winrisk.game.view.Game;
 
 import java.awt.*;
@@ -17,6 +18,7 @@ public class Player {
     private Color color;
     private boolean conq;
     private int rein;
+    private Mission mission;
 
     public Player(Color color2, PlayerInterface ifc) {
         this.playerInterface = ifc;
@@ -198,5 +200,13 @@ public class Player {
 
     public void setRein(int rein) {
         this.rein = rein;
+    }
+
+    public Mission getMission() {
+        return mission;
+    }
+
+    public void setMission(Mission mission) {
+        this.mission = mission;
     }
 }
