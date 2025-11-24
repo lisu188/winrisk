@@ -1,5 +1,6 @@
 package com.winrisk.gui;
 
+import com.winrisk.game.Play;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.view.Editor;
 
@@ -65,7 +66,43 @@ public class StartGame extends JFrame {
     }
 
     public static void main(String[] args) {
+        HeadlessConfig config = buildHeadlessConfig(args);
+        if (config.isHeadlessPlay()) {
+            Play play = new Play(config.getParams(), config.getMaxTurns());
+            play.play();
+            return;
+        }
         new StartGame().setVisible(true);
+    }
+
+    public static HeadlessConfig buildHeadlessConfig(String[] args) {
+        HeadlessConfig config = new HeadlessConfig();
+        if (args == null) {
+            return config;
+        }
+        for (String arg : args) {
+            if ("--headless-play".equalsIgnoreCase(arg)
+                    || "headless-play".equalsIgnoreCase(arg)) {
+                config.setHeadlessPlay(true);
+            } else if ("--fog-of-war".equalsIgnoreCase(arg)) {
+                config.getParams().setFogOfWar(true);
+            } else if ("--skynet".equalsIgnoreCase(arg)) {
+                config.getParams().setSkynetMode(true);
+            } else if ("--attack-with-all".equalsIgnoreCase(arg)) {
+                config.getParams().setAttackWithAll(true);
+            } else if (arg.startsWith("--ai-players=")) {
+                config.getParams().setAiPlayers(Integer.parseInt(arg.replace("--ai-players=", "")));
+            } else if (arg.startsWith("--max-turns=")) {
+                config.setMaxTurns(Integer.parseInt(arg.replace("--max-turns=", "")));
+            } else if (arg.startsWith("--map=")) {
+                config.getParams().setMap(arg.replace("--map=", ""));
+            }
+        }
+        if (config.getParams().getAiPlayers() == 0) {
+            config.getParams().setAiPlayers(6);
+        }
+        config.getParams().setHumanPlayers(0);
+        return config;
     }
 
     private Map createEmptyMap(String imagePath) throws IOException {
@@ -90,6 +127,32 @@ public class StartGame extends JFrame {
                 text + ": " + e.getClass().getSimpleName(),
                 title,
                 JOptionPane.ERROR_MESSAGE);
+    }
+
+    public static class HeadlessConfig {
+        private final com.winrisk.game.data.Params params = new com.winrisk.game.data.Params();
+        private boolean headlessPlay;
+        private int maxTurns = 5000;
+
+        public boolean isHeadlessPlay() {
+            return headlessPlay;
+        }
+
+        void setHeadlessPlay(boolean headlessPlay) {
+            this.headlessPlay = headlessPlay;
+        }
+
+        public com.winrisk.game.data.Params getParams() {
+            return params;
+        }
+
+        public int getMaxTurns() {
+            return maxTurns;
+        }
+
+        void setMaxTurns(int maxTurns) {
+            this.maxTurns = maxTurns;
+        }
     }
 
 }
