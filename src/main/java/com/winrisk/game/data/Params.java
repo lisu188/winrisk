@@ -17,6 +17,14 @@ public class Params implements Serializable {
 
     private transient String map;
 
+    private boolean randomMap;
+
+    private int randomContinents = 6;
+
+    private int randomFields = 30;
+
+    private Long randomSeed;
+
     private boolean skynetMode;
     private AiFactory aiFactory = i -> PlayerFactory.getRandomAI();
 
@@ -48,6 +56,11 @@ public class Params implements Serializable {
     }
 
     public Map loadMap() {
+        if (randomMap) {
+            return randomSeed == null
+                    ? new com.winrisk.game.map.MapGenerator().generate(randomFields, randomContinents)
+                    : new com.winrisk.game.map.MapGenerator(randomSeed).generate(randomFields, randomContinents);
+        }
         if (map == null) {
             try {
                 map = new File(Map.class.getResource("world.map").toURI())
@@ -86,5 +99,37 @@ public class Params implements Serializable {
 
     public void setMap(String map) {
         this.map = map;
+    }
+
+    public void setRandomMap(boolean randomMap) {
+        this.randomMap = randomMap;
+    }
+
+    public boolean isRandomMap() {
+        return randomMap;
+    }
+
+    public int getRandomContinents() {
+        return randomContinents;
+    }
+
+    public void setRandomContinents(int randomContinents) {
+        this.randomContinents = randomContinents;
+    }
+
+    public int getRandomFields() {
+        return randomFields;
+    }
+
+    public void setRandomFields(int randomFields) {
+        this.randomFields = randomFields;
+    }
+
+    public Long getRandomSeed() {
+        return randomSeed;
+    }
+
+    public void setRandomSeed(Long randomSeed) {
+        this.randomSeed = randomSeed;
     }
 }

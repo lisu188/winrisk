@@ -1,6 +1,7 @@
 package com.winrisk.game.map;
 
 import com.winrisk.game.TestUtil;
+import com.winrisk.game.data.Params;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.serialization.MapSketch;
@@ -9,6 +10,10 @@ import org.junit.Test;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 
@@ -66,6 +71,39 @@ public class MapTests {
         Map loaded = new Map(tmp.getAbsolutePath());
         loaded.save(tmp.getAbsolutePath());
         tmp.delete();
+    }
+
+    @Test
+    public void randomMapGenerationCreatesConnectedGraph() {
+        Params params = new Params();
+        params.setRandomMap(true);
+        params.setRandomFields(12);
+        params.setRandomContinents(3);
+        params.setRandomSeed(42L);
+
+        Map map = params.loadMap();
+
+        assertEquals(12, map.getFields().size());
+        assertEquals(3, map.getContinents().size());
+        assertTrue(isConnected(map));
+        map.getFields().forEach(field -> assertNotNull(field.getContinent()));
+    }
+
+    private boolean isConnected(Map map) {
+        if (map.getFields().isEmpty()) {
+            return true;
+        }
+        Set<Field> visited = new HashSet<>();
+        Queue<Field> queue = new LinkedList<>();
+        queue.add(map.getFields().get(0));
+        while (!queue.isEmpty()) {
+            Field current = queue.poll();
+            if (!visited.add(current)) {
+                continue;
+            }
+            queue.addAll(current.getNext());
+        }
+        return visited.size() == map.getFields().size();
     }
 
     private static final String CACHE = "" +
