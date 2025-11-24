@@ -5,6 +5,8 @@ import com.winrisk.game.map.Map;
 import org.junit.Test;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.*;
 
@@ -28,6 +30,11 @@ public class SerializationTests {
         Map loaded = new Map();
         ser.load(loaded, tmp.getAbsolutePath());
         assertEquals(map.getFields().size(), loaded.getFields().size());
+        assertTrue(readJson(tmp).trim().startsWith("{"));
         tmp.delete();
+    }
+
+    private String readJson(File file) throws Exception {
+        return Files.readString(file.toPath(), StandardCharsets.UTF_8);
     }
 }
