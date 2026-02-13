@@ -15,8 +15,33 @@ public class UtilTests {
     }
 
     @Test
+    public void arraysAvgFloatDecimals() {
+        assertEquals(1.5f, Arrays.avg(new float[]{1.2f, 1.8f}), 0.0001f);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void arraysAvgFloatEmpty() {
+        Arrays.avg(new float[]{});
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void arraysAvgFloatNull() {
+        Arrays.avg((float[]) null);
+    }
+
+    @Test
     public void arraysAvgInteger() {
         assertEquals(2.0f, Arrays.avg(new Integer[]{1,2,3}), 0.0001f);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void arraysAvgIntegerEmpty() {
+        Arrays.avg(new Integer[]{});
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void arraysAvgIntegerNull() {
+        Arrays.avg((Integer[]) null);
     }
 
     @Test
