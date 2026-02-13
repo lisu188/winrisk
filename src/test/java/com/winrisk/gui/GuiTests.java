@@ -127,4 +127,17 @@ public class GuiTests {
         } catch (HeadlessException e) {
         }
     }
+
+    @Test
+    public void gamePanelBuildSavePathUsesDirectoryAndFilename() {
+        String path = GamePanel.buildSavePath("tmp", "savegame.winrisk");
+        assertEquals(new File("tmp", "savegame.winrisk").getAbsolutePath(), path);
+    }
+
+    @Test
+    public void gamePanelBuildSavePathHandlesCancelSelection() {
+        assertNull(GamePanel.buildSavePath(null, "savegame.winrisk"));
+        assertNull(GamePanel.buildSavePath("tmp", null));
+    }
+
 }

@@ -10,7 +10,9 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowListener;
+import java.io.File;
 
 public class GamePanel extends JPanel {
 
@@ -19,6 +21,28 @@ public class GamePanel extends JPanel {
     private final GraphicsSurface surface = new GraphicsSurface();
 
     private final Viewable viewable;
+
+    private Window registeredWindow;
+
+    private final WindowListener windowListener = new WindowAdapter() {
+        @Override
+        public void windowClosing(WindowEvent e) {
+            String path = null;
+            int dialogResult = JOptionPane.showConfirmDialog(null,
+                    "Would You Like to Save First?", "Warning",
+                    JOptionPane.YES_NO_OPTION);
+            if (dialogResult == JOptionPane.YES_OPTION) {
+                FileDialog dialog = new FileDialog(
+                        (JFrame) SwingUtilities.getWindowAncestor(GamePanel.this));
+                dialog.setVisible(true);
+                path = buildSavePath(dialog.getDirectory(), dialog.getFile());
+            }
+            if (path != null) {
+                viewable.onSave(path);
+            }
+            new StartGame().setVisible(true);
+        }
+    };
 
     public GamePanel(Viewable viewable) {
         setMouseListener();
@@ -97,56 +121,18 @@ public class GamePanel extends JPanel {
     }
 
     private void setWindowListener() {
-        SwingUtilities.getWindowAncestor(this).addWindowListener(
-                new WindowListener() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window == null || window == registeredWindow) {
+            return;
+        }
+        window.addWindowListener(windowListener);
+        registeredWindow = window;
+    }
 
-                    @Override
-                    public void windowActivated(WindowEvent arg0) {
-
-                    }
-
-                    @Override
-                    public void windowClosed(WindowEvent arg0) {
-
-                    }
-
-                    @Override
-                    public void windowClosing(WindowEvent e) {
-                        String path = null;
-                        int dialogResult = JOptionPane.showConfirmDialog(null,
-                                "Would You Like to Save First?", "Warning",
-                                JOptionPane.YES_NO_OPTION);
-                        if (dialogResult == JOptionPane.YES_OPTION) {
-                            FileDialog dialog = new FileDialog(
-                                    (JFrame) SwingUtilities
-                                            .getWindowAncestor(GamePanel.this));
-                            dialog.setVisible(true);
-                            path = dialog.getFile();
-                        }
-                        if (path != null) {
-                            viewable.onSave(path);
-                        }
-                        new StartGame().setVisible(true);
-                    }
-
-                    @Override
-                    public void windowDeactivated(WindowEvent arg0) {
-                    }
-
-                    @Override
-                    public void windowDeiconified(WindowEvent arg0) {
-
-                    }
-
-                    @Override
-                    public void windowIconified(WindowEvent arg0) {
-
-                    }
-
-                    @Override
-                    public void windowOpened(WindowEvent arg0) {
-
-                    }
-                });
+    static String buildSavePath(String directory, String fileName) {
+        if (directory == null || fileName == null) {
+            return null;
+        }
+        return new File(directory, fileName).getAbsolutePath();
     }
 }
