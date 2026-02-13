@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.function.Consumer;
 
 public class StartGame extends JFrame {
 
@@ -44,13 +45,20 @@ public class StartGame extends JFrame {
     }
 
     public static void main(String[] args) {
+        launch(args,
+                () -> EventQueue.invokeLater(() -> new StartGame().setVisible(true)),
+                config -> new Play(config.getParams(), config.getMaxTurns()).play());
+    }
+
+    static void launch(String[] args,
+                       Runnable uiLauncher,
+                       Consumer<HeadlessConfig> headlessLauncher) {
         HeadlessConfig config = buildHeadlessConfig(args);
         if (config.isHeadlessPlay()) {
-            Play play = new Play(config.getParams(), config.getMaxTurns());
-            play.play();
+            headlessLauncher.accept(config);
             return;
         }
-        new StartGame().setVisible(true);
+        uiLauncher.run();
     }
 
     public static HeadlessConfig buildHeadlessConfig(String[] args) {
