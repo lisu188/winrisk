@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -116,6 +117,17 @@ public class PlayTests {
         assertEquals(4, params.getAiPlayers());
         assertEquals(0, params.getHumanPlayers());
         assertEquals(250, config.getMaxTurns());
+    }
+
+    @Test
+    public void headlessArgumentParsingHandlesNullArgsWithDefaults() {
+        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(null);
+
+        Params params = config.getParams();
+        assertFalse(config.isHeadlessPlay());
+        assertEquals(0, params.getAiPlayers());
+        assertEquals(1, params.getHumanPlayers());
+        assertEquals(5000, config.getMaxTurns());
     }
 
     @Test

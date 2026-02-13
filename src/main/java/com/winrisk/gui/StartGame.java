@@ -34,31 +34,9 @@ public class StartGame extends JFrame {
             StartGame.this.dispose();
         }));
 
-        btnNewMap.addActionListener(arg0 -> EventQueue.invokeLater(() -> {
-            try {
-                String path = getFilePath();
-                Map map = createEmptyMap(path);
-                new GamePanel(new Editor(map));
-            } catch (Exception e) {
-                handleException("Error loading background image.",
-                        "Inalid file format.", e);
-            }
+        btnNewMap.addActionListener(arg0 -> EventQueue.invokeLater(this::handleNewMapAction));
 
-        }));
-
-        button.addActionListener(arg0 -> EventQueue.invokeLater(() -> {
-            try {
-                final String file = getFilePath();
-                if (file == null) {
-                    return;
-                }
-                new GamePanel(new Editor(file));
-            } catch (Exception e) {
-                handleException("Chosen map file was not a correct map file.",
-                        "Inalid file format.", e);
-            }
-
-        }));
+        button.addActionListener(arg0 -> EventQueue.invokeLater(this::handleLoadMapAction));
 
         contentPane.add(buttonHostGame);
         contentPane.add(btnNewMap);
@@ -114,12 +92,49 @@ public class StartGame extends JFrame {
         return map;
     }
 
-    private String getFilePath() {
-        FileDialog dialog = new FileDialog(StartGame.this);
+    void handleNewMapAction() {
+        try {
+            String path = getFilePath();
+            if (path == null) {
+                return;
+            }
+            Map map = createEmptyMap(path);
+            new GamePanel(new Editor(map));
+        } catch (Exception e) {
+            handleException("Error loading background image.",
+                    "Invalid file format.", e);
+        }
+    }
+
+    void handleLoadMapAction() {
+        try {
+            final String file = getFilePath();
+            if (file == null) {
+                return;
+            }
+            new GamePanel(new Editor(file));
+        } catch (Exception e) {
+            handleException("Chosen map file was not a correct map file.",
+                    "Invalid file format.", e);
+        }
+    }
+
+    String getFilePath() {
+        FileDialog dialog = createFileDialog();
         dialog.setDirectory("save");
         dialog.setVisible(true);
-        return new File(dialog.getDirectory(), dialog.getFile())
-                .getAbsolutePath();
+        return buildSelectedPath(dialog.getDirectory(), dialog.getFile());
+    }
+
+    FileDialog createFileDialog() {
+        return new FileDialog(StartGame.this);
+    }
+
+    static String buildSelectedPath(String directory, String fileName) {
+        if (directory == null || fileName == null) {
+            return null;
+        }
+        return new File(directory, fileName).getAbsolutePath();
     }
 
     private void handleException(String text, String title, Exception e) {
