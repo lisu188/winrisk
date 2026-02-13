@@ -127,4 +127,40 @@ public class GuiTests {
         } catch (HeadlessException e) {
         }
     }
+
+    @Test
+    public void startGameBuildSelectedPathHandlesCancel() {
+        assertNull(StartGame.buildSelectedPath(null, "map.png"));
+        assertNull(StartGame.buildSelectedPath("save", null));
+        assertNotNull(StartGame.buildSelectedPath("save", "map.png"));
+    }
+
+    @Test
+    public void startGameActionsShortCircuitWhenSelectionCancelled() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        CancelledSelectionStartGame startGame = allocateWithoutConstructor(CancelledSelectionStartGame.class);
+
+        startGame.handleNewMapAction();
+        startGame.handleLoadMapAction();
+
+        assertEquals(2, startGame.getFilePathCallCount);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T allocateWithoutConstructor(Class<T> type) throws Exception {
+        Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        f.setAccessible(true);
+        sun.misc.Unsafe unsafe = (sun.misc.Unsafe) f.get(null);
+        return (T) unsafe.allocateInstance(type);
+    }
+
+    static class CancelledSelectionStartGame extends StartGame {
+        int getFilePathCallCount;
+
+        @Override
+        String getFilePath() {
+            getFilePathCallCount++;
+            return null;
+        }
+    }
 }
