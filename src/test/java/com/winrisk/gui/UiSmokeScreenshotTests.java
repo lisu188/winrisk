@@ -21,6 +21,8 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +33,11 @@ import static org.junit.Assert.assertTrue;
 
 public class UiSmokeScreenshotTests {
     private static final File REPORT_DIR = new File("build/reports/ui-smoke");
+    private static final String[] SCREENSHOT_FILES = {
+            "start-menu.png",
+            "game-board.png",
+            "gameplay-click-emulation.png"
+    };
 
     @Test
     public void writesStartMenuScreenshotForInspection() throws Exception {
@@ -215,6 +222,60 @@ public class UiSmokeScreenshotTests {
         assertTrue(ImageIO.write(image, "png", output));
         assertTrue(output.isFile());
         assertTrue(output.length() > 0);
+
+        writeIndex();
+        assertIndexReferencesScreenshots();
+    }
+
+    private static void writeIndex() throws Exception {
+        File output = new File(REPORT_DIR, "index.html");
+        Files.writeString(output.toPath(), buildIndex(), StandardCharsets.UTF_8);
+        assertTrue(output.isFile());
+        assertTrue(output.length() > 0);
+    }
+
+    private static String buildIndex() {
+        StringBuilder html = new StringBuilder();
+        html.append("<!doctype html>\n");
+        html.append("<html lang=\"en\">\n");
+        html.append("<head>\n");
+        html.append("  <meta charset=\"utf-8\">\n");
+        html.append("  <title>WinRisk UI Smoke Screenshots</title>\n");
+        html.append("  <style>\n");
+        html.append("    body { font-family: sans-serif; margin: 2rem; background: #f7f7f7; color: #222; }\n");
+        html.append("    h1 { margin-top: 0; }\n");
+        html.append("    ul { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); list-style: none; padding: 0; }\n");
+        html.append("    li { background: #fff; border: 1px solid #ddd; padding: 1rem; }\n");
+        html.append("    img { display: block; max-width: 100%; height: auto; border: 1px solid #ccc; }\n");
+        html.append("    a { color: #075985; }\n");
+        html.append("  </style>\n");
+        html.append("</head>\n");
+        html.append("<body>\n");
+        html.append("  <h1>WinRisk UI Smoke Screenshots</h1>\n");
+        html.append("  <ul>\n");
+        for (String fileName : SCREENSHOT_FILES) {
+            html.append("    <li>\n");
+            html.append("      <h2>").append(fileName).append("</h2>\n");
+            html.append("      <a href=\"").append(fileName).append("\">");
+            html.append("<img src=\"").append(fileName).append("\" alt=\"").append(fileName).append("\">");
+            html.append("</a>\n");
+            html.append("    </li>\n");
+        }
+        html.append("  </ul>\n");
+        html.append("</body>\n");
+        html.append("</html>\n");
+        return html.toString();
+    }
+
+    private static void assertIndexReferencesScreenshots() throws Exception {
+        File output = new File(REPORT_DIR, "index.html");
+        String html = Files.readString(output.toPath(), StandardCharsets.UTF_8);
+        for (String fileName : SCREENSHOT_FILES) {
+            assertTrue("index should link " + fileName,
+                    html.contains("href=\"" + fileName + "\""));
+            assertTrue("index should embed " + fileName,
+                    html.contains("src=\"" + fileName + "\""));
+        }
     }
 
     private static void assertImageHasContent(String name,
