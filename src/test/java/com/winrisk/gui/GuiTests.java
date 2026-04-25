@@ -17,6 +17,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.util.List;
 
 import static org.junit.Assert.*;
 
@@ -91,6 +93,24 @@ public class GuiTests {
             new HostGameWindow();
         } catch (Throwable ignore) {
         }
+    }
+
+    @Test
+    public void hostGameWindowMapListIncludesDefaultAndCustomFiles() throws Exception {
+        File folder = Files.createTempDirectory("winrisk-maps").toFile();
+        File customMap = new File(folder, "custom.map");
+        File nestedFolder = new File(folder, "nested");
+        assertTrue(customMap.createNewFile());
+        assertTrue(nestedFolder.mkdir());
+        customMap.deleteOnExit();
+        nestedFolder.deleteOnExit();
+        folder.deleteOnExit();
+
+        List<File> maps = HostGameWindow.getAvailableMaps(folder);
+
+        assertTrue(maps.stream().anyMatch(file -> "world.map".equals(file.getName())));
+        assertTrue(maps.contains(customMap));
+        assertFalse(maps.contains(nestedFolder));
     }
 
     @Test

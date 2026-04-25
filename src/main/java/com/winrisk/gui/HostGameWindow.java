@@ -8,6 +8,10 @@ import com.winrisk.game.view.Game;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 class HostGameWindow {
 
@@ -119,25 +123,44 @@ class HostGameWindow {
         });
         frame.getContentPane().add(startButton);
 
-        String path = "maps";
-        File folder = new File(path);
-        File[] listOfFiles = folder.listFiles();
-        try {
-            mapBox.addItem(new File(Map.class.getResource("world.map").toURI()) {
-                @Override
-                public String toString() {
-                    return this.getName();
-                }
+        for (File map : getAvailableMaps(new File("maps"))) {
+            mapBox.addItem(displayNameFile(map));
+        }
+    }
 
-            });
-            if (listOfFiles != null) {
-                for (File file : listOfFiles) {
-                    mapBox.addItem(file);
+    static List<File> getAvailableMaps(File folder) {
+        List<File> maps = new ArrayList<>();
+        maps.add(getDefaultMap());
+        File[] customMaps = folder == null ? null : folder.listFiles();
+        if (customMaps != null) {
+            for (File file : customMaps) {
+                if (file.isFile()) {
+                    maps.add(file);
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+        return maps;
+    }
+
+    private static File getDefaultMap() {
+        try {
+            URL resource = Map.class.getResource("world.map");
+            if (resource == null) {
+                throw new IllegalStateException("Default world map resource is unavailable");
+            }
+            return new File(resource.toURI());
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("Default world map resource is unavailable", e);
+        }
+    }
+
+    private static File displayNameFile(File file) {
+        return new File(file.getAbsolutePath()) {
+            @Override
+            public String toString() {
+                return getName();
+            }
+        };
     }
 
     public void setVisible(boolean arg0) {
