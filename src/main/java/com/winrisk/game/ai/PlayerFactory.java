@@ -52,4 +52,8 @@ public class PlayerFactory {
         return buildClass(AI.get(RANDOM.nextInt(AI.size())));
 
     }
+
+    public static PlayerInterface getDefaultAI(int index) {
+        return buildClass(AI.get(Math.floorMod(index, AI.size())));
+    }
 }

@@ -1,6 +1,7 @@
 package com.winrisk.gui;
 
 import com.winrisk.game.Play;
+import com.winrisk.game.data.GameMode;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.view.Editor;
 
@@ -47,7 +48,9 @@ public class StartGame extends JFrame {
     public static void main(String[] args) {
         launch(args,
                 () -> EventQueue.invokeLater(() -> new StartGame().setVisible(true)),
-                config -> new Play(config.getParams(), config.getMaxTurns()).play());
+                config -> System.out.println(new Play(config.getParams(), config.getMaxTurns())
+                        .playResult()
+                        .toReport()));
     }
 
     static void launch(String[] args,
@@ -76,16 +79,28 @@ public class StartGame extends JFrame {
                 config.getParams().setSkynetMode(true);
             } else if ("--attack-with-all".equalsIgnoreCase(arg)) {
                 config.getParams().setAttackWithAll(true);
+            } else if ("--incremental-cards".equalsIgnoreCase(arg)) {
+                config.getParams().getRulesOptions().setIncrementalCardSetValues(true);
+            } else if ("--expanded-maneuver".equalsIgnoreCase(arg)) {
+                config.getParams().getRulesOptions().setExpandedManeuver(true);
+            } else if ("--attack-card-reroll".equalsIgnoreCase(arg)) {
+                config.getParams().getRulesOptions().setAttackCardReroll(true);
+            } else if ("--commander-die".equalsIgnoreCase(arg)) {
+                config.getParams().getRulesOptions().setCommanderDie(true);
             } else if (arg.startsWith("--ai-players=")) {
                 config.getParams().setAiPlayers(Integer.parseInt(arg.replace("--ai-players=", "")));
             } else if (arg.startsWith("--max-turns=")) {
                 config.setMaxTurns(Integer.parseInt(arg.replace("--max-turns=", "")));
             } else if (arg.startsWith("--map=")) {
                 config.getParams().setMap(arg.replace("--map=", ""));
+            } else if (arg.startsWith("--mode=")) {
+                config.getParams().setGameMode(GameMode.fromCli(arg.replace("--mode=", "")));
+            } else if (arg.startsWith("--seed=")) {
+                config.getParams().setRandomSeed(Long.parseLong(arg.replace("--seed=", "")));
             }
         }
         if (config.getParams().getAiPlayers() == 0) {
-            config.getParams().setAiPlayers(6);
+            config.getParams().setAiPlayers(3);
         }
         config.getParams().setHumanPlayers(0);
         return config;

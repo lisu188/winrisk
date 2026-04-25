@@ -5,51 +5,56 @@ import com.winrisk.game.cluster.ContinentList;
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PatchList;
 import com.winrisk.game.mission.Mission;
+import com.winrisk.game.rules.CardSymbol;
+import com.winrisk.game.rules.RiskCard;
 import com.winrisk.game.view.Game;
 
 import java.awt.*;
-import java.util.Random;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class Player {
 
     private final PlayerInterface playerInterface;
-    private int[] cards;
+    private final List<RiskCard> riskCards = new ArrayList<>();
     private Color color;
-    private boolean conq;
+    private boolean conqueredTerritoryThisTurn;
     private int rein;
     private Mission mission;
+    private boolean neutral;
+    private Field headquarters;
 
     public Player(Color color2, PlayerInterface ifc) {
         this.playerInterface = ifc;
         this.color = color2;
-        conq = false;
-        cards = new int[3];
+        conqueredTerritoryThisTurn = false;
         rein = 0;
     }
 
+    @Deprecated
     public void addCard() {
-        if (conq) {
+        if (conqueredTerritoryThisTurn) {
             return;
         }
-        conq = true;
-        Random gen = new Random();
-        cards[gen.nextInt(3)]++;
+        conqueredTerritoryThisTurn = true;
+        riskCards.add(RiskCard.wild());
     }
 
+    public void addCard(RiskCard card) {
+        if (card != null) {
+            riskCards.add(card);
+        }
+    }
+
+    public void addCards(Collection<RiskCard> cards) {
+        riskCards.addAll(cards);
+    }
+
+    @Deprecated
     public void applyCardBonus() {
-        rein(getCardBonus());
-        conq = false;
-        for (int i = 0; i < 3; i++) {
-            if (cards[i] >= 3) {
-                cards[i] -= 3;
-            }
-        }
-        if ((cards[0] > 0) && (cards[1] > 0) && (cards[2] > 0)) {
-            cards[0]--;
-            cards[1]--;
-            cards[2]--;
-        }
+        conqueredTerritoryThisTurn = false;
     }
 
     public void applyContinentBonus(ContinentList continents) {
@@ -59,10 +64,6 @@ public class Player {
     public void applyTerritoryBonus(FieldList fields, Game game) {
         fields.forEach(com.winrisk.game.object.Field::setMin);
         rein(getTerritoryBonus(game));
-    }
-
-    private int cardSum() {
-        return cards[0] + cards[1] + cards[2];
     }
 
     @Override
@@ -92,21 +93,23 @@ public class Player {
                 .collect(Collectors.toCollection(FieldList::new));
     }
 
-    int getCardBonus() {
-        conq = false;
-        for (int i = 0; i < 3; i++) {
-            if (cards[i] >= 3) {
-                return (i + 2) * 2;
+    @Deprecated
+    public int[] getCards() {
+        int[] counts = new int[3];
+        for (RiskCard card : riskCards) {
+            if (card.getSymbol() == CardSymbol.INFANTRY) {
+                counts[0]++;
+            } else if (card.getSymbol() == CardSymbol.CAVALRY) {
+                counts[1]++;
+            } else if (card.getSymbol() == CardSymbol.ARTILLERY) {
+                counts[2]++;
             }
         }
-        if ((cards[0] > 0) && (cards[1] > 0) && (cards[2] > 0)) {
-            return 10;
-        }
-        return 0;
+        return counts;
     }
 
-    public int[] getCards() {
-        return cards;
+    public List<RiskCard> getRiskCards() {
+        return riskCards;
     }
 
     public Color getColor() {
@@ -161,7 +164,7 @@ public class Player {
     }
 
     public boolean isDead(Game game) {
-        return getFieldState(game) <= 0;
+        return !neutral && getFieldState(game) <= 0;
     }
 
     public PatchList getPatchList(Game game) {
@@ -185,17 +188,14 @@ public class Player {
     }
 
     public void takeCards(Player player, Game game) {
-        boolean tmp = conq;
+        boolean tmp = conqueredTerritoryThisTurn;
         if (!player.isDead(game)) {
             throw new RuntimeException("Not dead player.");
         }
-        this.cards[0] += player.getCards()[0];
-        this.cards[1] += player.getCards()[1];
-        this.cards[2] += player.getCards()[2];
-        while (cardSum() >= 5) {
-            applyCardBonus();
-        }
-        conq = tmp;
+        this.riskCards.addAll(player.getRiskCards());
+        player.getRiskCards().clear();
+        game.getCardService().tradeAfterElimination(game, this);
+        conqueredTerritoryThisTurn = tmp;
     }
 
     public void setRein(int rein) {
@@ -208,5 +208,29 @@ public class Player {
 
     public void setMission(Mission mission) {
         this.mission = mission;
+    }
+
+    public boolean hasConqueredTerritoryThisTurn() {
+        return conqueredTerritoryThisTurn;
+    }
+
+    public void setConqueredTerritoryThisTurn(boolean conqueredTerritoryThisTurn) {
+        this.conqueredTerritoryThisTurn = conqueredTerritoryThisTurn;
+    }
+
+    public boolean isNeutral() {
+        return neutral;
+    }
+
+    public void setNeutral(boolean neutral) {
+        this.neutral = neutral;
+    }
+
+    public Field getHeadquarters() {
+        return headquarters;
+    }
+
+    public void setHeadquarters(Field headquarters) {
+        this.headquarters = headquarters;
     }
 }

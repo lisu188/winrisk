@@ -4,6 +4,7 @@ import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.ai.PlayerInterface;
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PlayerList;
+import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.GamePhase;
 import com.winrisk.game.data.MotionEvent;
 import com.winrisk.game.data.Params;
@@ -12,10 +13,16 @@ import com.winrisk.game.mission.MissionDeck;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
+import com.winrisk.game.rules.CombatResolver;
+import com.winrisk.game.rules.CombatResult;
+import com.winrisk.game.rules.OfficialSetup;
+import com.winrisk.game.rules.RiskCardService;
+import com.winrisk.game.rules.WinConditionEvaluator;
 import com.winrisk.game.serialization.MapSketch;
 import com.winrisk.game.util.Colors;
 import com.winrisk.game.util.PointF;
 
+import java.awt.Color;
 import java.util.Random;
 
 public class Game implements FieldListener, Viewable {
@@ -29,25 +36,34 @@ public class Game implements FieldListener, Viewable {
     private PlayerList players;
     private MissionDeck missionDeck;
     private Player missionWinner;
+    private Player winner;
+    private String winReason;
+    private Player neutralPlayer;
+    private Random random;
+    private RiskCardService cardService;
+    private CombatResolver combatResolver;
+    private WinConditionEvaluator winConditionEvaluator;
+    private boolean maneuverUsed;
+    private boolean commanderDieUsed;
 
     public Game(Params params) {
         this.params = params;
+        this.random = params.createRandom();
+        this.cardService = new RiskCardService(random, params.getRulesOptions());
+        this.combatResolver = new CombatResolver(random);
+        this.winConditionEvaluator = new WinConditionEvaluator();
         this.map = params.loadMap();
         startNewGame();
     }
 
     public boolean end() {
-        evaluateMissionWin();
-        if (missionWinner != null) {
-            return true;
+        winner = winConditionEvaluator.evaluate(this);
+        winReason = winConditionEvaluator.getReason();
+        if (params.getGameMode() == GameMode.SECRET_MISSION
+                && "secret mission completed".equals(winReason)) {
+            missionWinner = winner;
         }
-        int alive = 0;
-        for (Player player : players) {
-            if (!player.isDead(this)) {
-                alive++;
-            }
-        }
-        return (alive == 1);
+        return winner != null;
     }
 
     public int getCurPlayer() {
@@ -106,49 +122,90 @@ public class Game implements FieldListener, Viewable {
 
     public void setPlayers(PlayerList players) {
         this.players = players;
+        if (players != null && !players.isEmpty() && curPlayer >= players.size()) {
+            curPlayer = 0;
+        }
     }
 
     public Player getMissionWinner() {
+        if (missionWinner == null) {
+            end();
+        }
         return missionWinner;
     }
 
     public Player getWinner() {
-        if (missionWinner != null) {
-            return missionWinner;
+        if (winner == null) {
+            end();
         }
-        return players.stream()
-                .filter(player -> !player.isDead(this))
-                .findFirst()
-                .orElse(null);
+        return winner;
+    }
+
+    public String getWinReason() {
+        if (winReason == null) {
+            end();
+        }
+        return winReason;
+    }
+
+    public Random getRandom() {
+        return random;
+    }
+
+    public RiskCardService getCardService() {
+        return cardService;
+    }
+
+    public Player getNeutralPlayer() {
+        return neutralPlayer;
+    }
+
+    public Player getDefenseController(Player defender) {
+        if (defender == neutralPlayer && players != null) {
+            return players.stream()
+                    .filter(player -> !player.isNeutral())
+                    .filter(player -> player != getPlayer())
+                    .findFirst()
+                    .orElse(getPlayer());
+        }
+        return defender;
+    }
+
+    public boolean isCommanderDieUsed() {
+        return commanderDieUsed;
+    }
+
+    public void setCommanderDieUsed(boolean commanderDieUsed) {
+        this.commanderDieUsed = commanderDieUsed;
     }
 
     private void incState() {
         curState = curState.getNextState();
         if (curState == GamePhase.REINFORCE) {
-            curPlayer = (curPlayer + 1) % players.size();
-            getPlayer().applyCardBonus();
-            getPlayer().applyContinentBonus(map.getContinents());
-            getPlayer().applyTerritoryBonus(map.getFields(), this);
+            advanceToNextActivePlayer();
+            maneuverUsed = false;
+            commanderDieUsed = false;
+            Player player = getPlayer();
+            player.setConqueredTerritoryThisTurn(false);
+            cardService.beginTurn(this, player);
+            player.applyContinentBonus(map.getContinents());
+            player.applyTerritoryBonus(map.getFields(), this);
+        } else if (curState == GamePhase.MOVE) {
+            cardService.awardConquestCard(getPlayer());
         }
     }
 
-    private void initFields() {
-        Random gen = new Random();
-        int fields = map.getFields().size();
-        for (int i = 0; i < fields; i++) {
-            map.getFields().get(i).setArmy(gen.nextInt(9) + 1);
-        }
-        for (int i = 0; i < fields; i++) {
-            int player = gen.nextInt(players.size());
-            players.get(player).obtainField(map.getFields().get(i));
-        }
+    private void advanceToNextActivePlayer() {
+        do {
+            curPlayer = (curPlayer + 1) % players.size();
+        } while (getPlayer().isNeutral() || getPlayer().isDead(this));
     }
 
     private void initPlayers() {
         players = new PlayerList();
         int playerCount = params.getAiPlayers() + params.getHumanPlayers();
-        for (int i = 0; i < (map.getFields().size() < playerCount ? map
-                .getFields().size() : playerCount); i++) {
+        validatePlayerCount(playerCount);
+        for (int i = 0; i < playerCount; i++) {
             PlayerInterface ifc;
             if (i < params.getHumanPlayers()) {
                 ifc = PlayerFactory.getHuman();
@@ -157,26 +214,27 @@ public class Game implements FieldListener, Viewable {
             }
             players.add(new Player(Colors.get(i), ifc));
         }
-    }
-
-    private void assignMissions() {
-        missionDeck = new MissionDeck(map, players);
-        for (Player player : players) {
-            Mission mission = missionDeck.draw(player);
-            player.setMission(mission);
+        if (params.getGameMode() == GameMode.CLASSIC && playerCount == 2) {
+            neutralPlayer = new Player(Color.GRAY, new com.winrisk.game.ai.PlayerAI());
+            neutralPlayer.setNeutral(true);
+            players.add(neutralPlayer);
         }
     }
 
-    private void evaluateMissionWin() {
-        if (missionWinner != null) {
-            return;
+    private void validatePlayerCount(int playerCount) {
+        int min = params.getGameMode() == GameMode.CLASSIC ? 2 : 3;
+        if (playerCount < min || playerCount > 5) {
+            throw new IllegalArgumentException(params.getGameMode()
+                    + " supports " + min + "-5 active players");
         }
+    }
+
+    public void assignMissions() {
+        missionDeck = new MissionDeck(map, players, random);
         for (Player player : players) {
-            Mission mission = player.getMission();
-            if ((mission != null) && !player.isDead(this)
-                    && mission.isCompleted(this, player)) {
-                missionWinner = player;
-                break;
+            if (!player.isNeutral()) {
+                Mission mission = missionDeck.draw(player);
+                player.setMission(mission);
             }
         }
     }
@@ -208,11 +266,65 @@ public class Game implements FieldListener, Viewable {
     @Override
     public void onDraw(GameSurface graphics) {
         map.draw(graphics, this);
+        drawHud(graphics);
     }
 
     @Override
     public void onEvent(MotionEvent event) {
         fieldDetector.feed(event);
+    }
+
+    public CombatResult attack(Field from, Field to) {
+        return combatResolver.attack(this, from, to);
+    }
+
+    public boolean maneuver(Field from, Field to, int troops) {
+        if (from == null || to == null) {
+            return false;
+        }
+        if (params.getRulesOptions().isExpandedManeuver()) {
+            return from.getPlayer() == getPlayer()
+                    && from.getPlayer() == to.getPlayer()
+                    && from.getPatch().contains(to)
+                    && from.move(to, troops);
+        }
+        if (maneuverUsed) {
+            return false;
+        }
+        if (from.getPlayer() != getPlayer()) {
+            return false;
+        }
+        if (from.getPlayer() != to.getPlayer()) {
+            return false;
+        }
+        if (!from.getPatch().contains(to)) {
+            return false;
+        }
+        boolean moved = from.move(to, troops);
+        maneuverUsed = moved;
+        return moved;
+    }
+
+    private void drawHud(GameSurface graphics) {
+        if (players == null || players.isEmpty() || curPlayer < 0) {
+            return;
+        }
+        Player player = getPlayer();
+        graphics.setColor(Color.BLACK);
+        int y = 18;
+        graphics.drawString("Mode: " + params.getGameMode().toCliValue()
+                + " | Phase: " + curState
+                + " | Player: " + (curPlayer + 1)
+                + (player.isNeutral() ? " neutral" : ""), 10, y);
+        y += 16;
+        graphics.drawString("Reinforcements: " + player.getCurrentReinforcements()
+                + " | Cards: " + player.getRiskCards().size(), 10, y);
+        y += 16;
+        if (params.getGameMode() == GameMode.SECRET_MISSION && player.getMission() != null) {
+            graphics.drawString("Mission: " + player.getMission().getDescription(), 10, y);
+        } else if (params.getGameMode() == GameMode.CAPITAL && player.getHeadquarters() != null) {
+            graphics.drawString("Headquarters: " + player.getHeadquarters().getDisplayName(), 10, y);
+        }
     }
 
     @Override
@@ -232,18 +344,10 @@ public class Game implements FieldListener, Viewable {
                 if (!from.getNext().contains(to)) {
                     return false;
                 }
-                from.fight(to, this);
-                return true;
+                return attack(from, to).isLegal();
 
             case MOVE:
-                if (from.getPlayer() != getPlayer()) {
-                    return false;
-                }
-                if (!from.getPatch().contains(to)) {
-                    return false;
-                }
-                from.move(to, 1);
-                return true;
+                return maneuver(from, to, 1);
             case UNDEFINED:
                 throw new RuntimeException("Undefined game state");
         }
@@ -309,9 +413,8 @@ public class Game implements FieldListener, Viewable {
 
     private void startNewGame() {
         initPlayers();
-        initFields();
-        assignMissions();
-        curPlayer = -1;
+        int firstPlayer = new OfficialSetup(this, random).setup();
+        curPlayer = firstPlayer - 1;
         curState = GamePhase.UNDEFINED;
         incState();
     }

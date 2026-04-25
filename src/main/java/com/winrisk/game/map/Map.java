@@ -35,6 +35,7 @@ public class Map implements Saveable {
 
     public void addField(PointF point) {
         fields.add(new Field(new PointF(point.x, point.y)));
+        applyMetadata();
     }
 
     public void draw(GameSurface graphics, Game game) {
@@ -53,6 +54,7 @@ public class Map implements Saveable {
     @Override
     public void fromSketch(Sketch sketch) {
         ((MapSketch) sketch).toMap(this);
+        applyMetadata();
 
     }
 
@@ -79,6 +81,7 @@ public class Map implements Saveable {
 
     public void load(String path) {
         serializer.load(this, path);
+        applyMetadata();
     }
 
     public void save(String path) {
@@ -147,5 +150,9 @@ public class Map implements Saveable {
 
     public int proximity(int i, int j) {
         return proximity(null, fields.get(i), fields.get(j));
+    }
+
+    public void applyMetadata() {
+        WorldTerritoryMetadata.apply(this);
     }
 }

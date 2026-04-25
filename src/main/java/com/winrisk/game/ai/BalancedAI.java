@@ -34,7 +34,7 @@ public class BalancedAI implements PlayerInterface {
         Field destination = borders.isEmpty() ? fields.getWeak(game) : borders.getWeak(game);
         for (Field field : fields) {
             if (!borders.contains(field) && field.getArmy() > 1) {
-                field.move(destination, field.getArmy() - 1);
+                game.maneuver(field, destination, field.getArmy() - 1);
             }
         }
     }
