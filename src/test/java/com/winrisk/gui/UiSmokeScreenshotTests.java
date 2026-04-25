@@ -6,6 +6,7 @@ import com.winrisk.game.data.Params;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
 import com.winrisk.game.view.Game;
+import com.winrisk.game.view.GameSurface;
 import org.junit.Test;
 
 import javax.imageio.ImageIO;
@@ -54,13 +55,7 @@ public class UiSmokeScreenshotTests {
     public void writesGameBoardScreenshotForInspection() throws Exception {
         String originalHeadless = forceHeadless();
         try {
-            Params params = new Params();
-            params.setHumanPlayers(0);
-            params.setAiPlayers(3);
-            params.setGameMode(GameMode.CLASSIC);
-            params.setRandomSeed(1234L);
-
-            GamePanel panel = new GamePanel(new Game(params));
+            GamePanel panel = new GamePanel(createClassicGame());
             BufferedImage image = render(panel, 800, 600);
 
             assertImageHasContent("game board", image, 16);
@@ -68,6 +63,19 @@ public class UiSmokeScreenshotTests {
         } finally {
             restoreHeadless(originalHeadless);
         }
+    }
+
+    @Test
+    public void hudUsesLeftAlignedTextInsideViewport() {
+        Game game = createClassicGame();
+        RecordingSurface surface = new RecordingSurface();
+
+        game.onDraw(surface);
+
+        assertTrue(surface.leftAlignedStrings.stream()
+                .anyMatch(text -> text.value.startsWith("Mode: classic")));
+        assertTrue(surface.leftAlignedStrings.stream()
+                .allMatch(text -> text.x >= 12));
     }
 
     @Test
@@ -250,6 +258,45 @@ public class UiSmokeScreenshotTests {
             if (child instanceof Container) {
                 collectButtonLabels((Container) child, labels);
             }
+        }
+    }
+
+    private static class RecordingSurface implements GameSurface {
+        private final List<DrawnString> leftAlignedStrings = new ArrayList<>();
+
+        @Override
+        public void drawBackground(byte[] background) {
+        }
+
+        @Override
+        public void drawLine(int x, int y, int x2, int y2) {
+        }
+
+        @Override
+        public void drawOval(int x, int y, int i, int j) {
+        }
+
+        @Override
+        public void drawString(String string, int x, int y) {
+        }
+
+        @Override
+        public void drawStringLeft(String string, int x, int y) {
+            leftAlignedStrings.add(new DrawnString(string, x));
+        }
+
+        @Override
+        public void setColor(Color white) {
+        }
+    }
+
+    private static class DrawnString {
+        private final String value;
+        private final int x;
+
+        DrawnString(String value, int x) {
+            this.value = value;
+            this.x = x;
         }
     }
 }

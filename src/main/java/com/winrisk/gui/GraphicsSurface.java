@@ -59,6 +59,12 @@ public class GraphicsSurface implements GameSurface {
     }
 
     @Override
+    public void drawStringLeft(String string, int x, int y) {
+        graphics.drawString(string, x, (int) (y + (graphics
+                .getFontMetrics().getHeight() / 4F)));
+    }
+
+    @Override
     public void setColor(Color white) {
         graphics.setColor(white);
     }
