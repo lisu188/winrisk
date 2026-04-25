@@ -34,7 +34,59 @@ public class SerializationTests {
         tmp.delete();
     }
 
+    @Test
+    public void javaSerializerRejectsBlankPaths() throws Exception {
+        JavaSerializer serializer = new JavaSerializer();
+        Map map = new Map();
+
+        assertThrowsException(IllegalArgumentException.class,
+                () -> serializer.load(map, null));
+        assertThrowsException(IllegalArgumentException.class,
+                () -> serializer.save(map, " "));
+    }
+
+    @Test
+    public void javaSerializerRejectsUnsupportedData() throws Exception {
+        JavaSerializer serializer = new JavaSerializer();
+        File tmp = File.createTempFile("invalid-map", ".dat");
+        Files.writeString(tmp.toPath(), "not a serialized map", StandardCharsets.UTF_8);
+
+        assertThrowsException(IllegalArgumentException.class,
+                () -> serializer.load(new Map(), tmp.getAbsolutePath()));
+        tmp.delete();
+    }
+
+    @Test
+    public void javaSerializerRejectsIncompleteJsonMap() throws Exception {
+        JavaSerializer serializer = new JavaSerializer();
+        File tmp = File.createTempFile("incomplete-map", ".dat");
+        Files.writeString(tmp.toPath(), "{}", StandardCharsets.UTF_8);
+
+        assertThrowsException(IllegalArgumentException.class,
+                () -> serializer.load(new Map(), tmp.getAbsolutePath()));
+        tmp.delete();
+    }
+
     private String readJson(File file) throws Exception {
         return Files.readString(file.toPath(), StandardCharsets.UTF_8);
+    }
+
+    private <T extends Exception> T assertThrowsException(
+            Class<T> expected,
+            ThrowingRunnable runnable) throws Exception {
+        try {
+            runnable.run();
+        } catch (Exception e) {
+            if (expected.isInstance(e)) {
+                return expected.cast(e);
+            }
+            throw e;
+        }
+        fail("Expected " + expected.getSimpleName());
+        return null;
+    }
+
+    private interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }
