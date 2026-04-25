@@ -97,15 +97,15 @@ public class StartGame extends JFrame {
             } else if ("--commander-die".equalsIgnoreCase(arg)) {
                 config.getParams().getRulesOptions().setCommanderDie(true);
             } else if (arg.startsWith("--ai-players=")) {
-                config.getParams().setAiPlayers(Integer.parseInt(arg.replace("--ai-players=", "")));
+                config.getParams().setAiPlayers(parsePositiveInt(arg, "--ai-players"));
             } else if (arg.startsWith("--max-turns=")) {
-                config.setMaxTurns(Integer.parseInt(arg.replace("--max-turns=", "")));
+                config.setMaxTurns(parsePositiveInt(arg, "--max-turns"));
             } else if (arg.startsWith("--map=")) {
-                config.getParams().setMap(arg.replace("--map=", ""));
+                config.getParams().setMap(parseRequiredValue(arg, "--map"));
             } else if (arg.startsWith("--mode=")) {
-                config.getParams().setGameMode(GameMode.fromCli(arg.replace("--mode=", "")));
+                config.getParams().setGameMode(GameMode.fromCli(parseRequiredValue(arg, "--mode")));
             } else if (arg.startsWith("--seed=")) {
-                config.getParams().setRandomSeed(Long.parseLong(arg.replace("--seed=", "")));
+                config.getParams().setRandomSeed(parseLong(arg, "--seed"));
             }
         }
         if (config.getParams().getAiPlayers() == 0) {
@@ -113,6 +113,36 @@ public class StartGame extends JFrame {
         }
         config.getParams().setHumanPlayers(0);
         return config;
+    }
+
+    private static String parseRequiredValue(String arg, String option) {
+        String value = arg.substring((option + "=").length());
+        if (value.trim().isEmpty()) {
+            throw new IllegalArgumentException(option + " requires a value");
+        }
+        return value;
+    }
+
+    private static int parsePositiveInt(String arg, String option) {
+        String value = parseRequiredValue(arg, option);
+        try {
+            int parsed = Integer.parseInt(value.trim());
+            if (parsed <= 0) {
+                throw new IllegalArgumentException(option + " must be greater than zero");
+            }
+            return parsed;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(option + " requires a positive integer: " + value, e);
+        }
+    }
+
+    private static long parseLong(String arg, String option) {
+        String value = parseRequiredValue(arg, option);
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(option + " requires an integer seed: " + value, e);
+        }
     }
 
     private Map createEmptyMap(String imagePath) throws IOException {

@@ -33,6 +33,25 @@ public class StartGameLaunchTests {
     }
 
     @Test
+    public void buildHeadlessConfigRejectsInvalidNumericOptions() {
+        assertInvalidConfig("--ai-players=0");
+        assertInvalidConfig("--ai-players=-1");
+        assertInvalidConfig("--ai-players=two");
+        assertInvalidConfig("--max-turns=0");
+        assertInvalidConfig("--max-turns=-5");
+        assertInvalidConfig("--max-turns=soon");
+        assertInvalidConfig("--seed=");
+        assertInvalidConfig("--seed=abc");
+    }
+
+    @Test
+    public void buildHeadlessConfigRejectsBlankRequiredValues() {
+        assertInvalidConfig("--map=");
+        assertInvalidConfig("--map=   ");
+        assertInvalidConfig("--mode=");
+    }
+
+    @Test
     public void launchWithoutHeadlessFlagRunsUiBranchOnly() {
         AtomicBoolean uiLaunched = new AtomicBoolean(false);
         AtomicBoolean headlessLaunched = new AtomicBoolean(false);
@@ -59,5 +78,14 @@ public class StartGameLaunchTests {
         assertEquals(3, captured.get().getParams().getAiPlayers());
         assertEquals(0, captured.get().getParams().getHumanPlayers());
         assertEquals(5000, captured.get().getMaxTurns());
+    }
+
+    private void assertInvalidConfig(String arg) {
+        try {
+            StartGame.buildHeadlessConfig(new String[]{arg});
+            fail("Expected invalid headless config for " + arg);
+        } catch (IllegalArgumentException expected) {
+            // expected
+        }
     }
 }
