@@ -43,4 +43,15 @@ public class AITests {
         assertNotNull(ai);
         assertFalse(ai.isInteractive());
     }
+
+    @Test
+    public void playerFactoryCyclesDefaultAis() {
+        assertTrue(PlayerFactory.getDefaultAI(0) instanceof EasyAI);
+        assertTrue(PlayerFactory.getDefaultAI(1) instanceof ContinentAI);
+        assertTrue(PlayerFactory.getDefaultAI(2) instanceof BalancedAI);
+        assertTrue(PlayerFactory.getDefaultAI(3) instanceof BorderGuardAI);
+        assertTrue(PlayerFactory.getDefaultAI(4) instanceof RandomAI);
+        assertTrue(PlayerFactory.getDefaultAI(5) instanceof EasyAI);
+        assertTrue(PlayerFactory.getDefaultAI(-1) instanceof RandomAI);
+    }
 }
