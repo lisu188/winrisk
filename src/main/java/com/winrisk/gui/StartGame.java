@@ -22,27 +22,36 @@ public class StartGame extends JFrame {
         setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setBounds(100, 100, 200, 200);
+        setContentPane(createMenuPanel(
+                () -> {
+                    new HostGameWindow().setVisible(true);
+                    StartGame.this.dispose();
+                },
+                this::handleNewMapAction,
+                this::handleLoadMapAction));
+    }
+
+    static JPanel createMenuPanel(Runnable hostGameAction,
+                                  Runnable newMapAction,
+                                  Runnable loadMapAction) {
         JPanel contentPane = new JPanel();
         contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
-        setContentPane(contentPane);
         contentPane.setLayout(new GridLayout(0, 1, 0, 0));
 
         JButton buttonHostGame = new JButton("HOST GAME");
         JButton btnNewMap = new JButton("NEW MAP");
         JButton button = new JButton("LOAD MAP");
 
-        buttonHostGame.addActionListener(arg0 -> EventQueue.invokeLater(() -> {
-            new HostGameWindow().setVisible(true);
-            StartGame.this.dispose();
-        }));
+        buttonHostGame.addActionListener(arg0 -> EventQueue.invokeLater(hostGameAction));
 
-        btnNewMap.addActionListener(arg0 -> EventQueue.invokeLater(this::handleNewMapAction));
+        btnNewMap.addActionListener(arg0 -> EventQueue.invokeLater(newMapAction));
 
-        button.addActionListener(arg0 -> EventQueue.invokeLater(this::handleLoadMapAction));
+        button.addActionListener(arg0 -> EventQueue.invokeLater(loadMapAction));
 
         contentPane.add(buttonHostGame);
         contentPane.add(btnNewMap);
         contentPane.add(button);
+        return contentPane;
     }
 
     public static void main(String[] args) {

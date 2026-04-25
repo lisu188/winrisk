@@ -26,6 +26,13 @@ jobs:
           restore-keys: ${{ runner.os }}-gradle
       - name: Build with Gradle
         run: ./gradlew build distZip
+      - name: Upload UI smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-ui-smoke-screenshots
+          path: build/reports/ui-smoke/**
+          if-no-files-found: warn
       - name: Upload distribution
         uses: actions/upload-artifact@v4
         with:

@@ -311,19 +311,20 @@ public class Game implements FieldListener, Viewable {
         }
         Player player = getPlayer();
         graphics.setColor(Color.BLACK);
+        int x = 12;
         int y = 18;
-        graphics.drawString("Mode: " + params.getGameMode().toCliValue()
+        graphics.drawStringLeft("Mode: " + params.getGameMode().toCliValue()
                 + " | Phase: " + curState
                 + " | Player: " + (curPlayer + 1)
-                + (player.isNeutral() ? " neutral" : ""), 10, y);
+                + (player.isNeutral() ? " neutral" : ""), x, y);
         y += 16;
-        graphics.drawString("Reinforcements: " + player.getCurrentReinforcements()
-                + " | Cards: " + player.getRiskCards().size(), 10, y);
+        graphics.drawStringLeft("Reinforcements: " + player.getCurrentReinforcements()
+                + " | Cards: " + player.getRiskCards().size(), x, y);
         y += 16;
         if (params.getGameMode() == GameMode.SECRET_MISSION && player.getMission() != null) {
-            graphics.drawString("Mission: " + player.getMission().getDescription(), 10, y);
+            graphics.drawStringLeft("Mission: " + player.getMission().getDescription(), x, y);
         } else if (params.getGameMode() == GameMode.CAPITAL && player.getHeadquarters() != null) {
-            graphics.drawString("Headquarters: " + player.getHeadquarters().getDisplayName(), 10, y);
+            graphics.drawStringLeft("Headquarters: " + player.getHeadquarters().getDisplayName(), x, y);
         }
     }
 

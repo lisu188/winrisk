@@ -11,6 +11,10 @@ public interface GameSurface {
 
     void drawString(String string, int x, int y);
 
+    default void drawStringLeft(String string, int x, int y) {
+        drawString(string, x, y);
+    }
+
     void setColor(Color white);
 
 }

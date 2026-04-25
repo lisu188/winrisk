@@ -24,7 +24,8 @@ public class GamePanel extends JPanel {
         setMouseListener();
         setAncestorListener();
         this.viewable = viewable;
-        if (!GraphicsEnvironment.isHeadless()) {
+        if (!Boolean.getBoolean("java.awt.headless")
+                && !GraphicsEnvironment.isHeadless()) {
             JFrame frame = new JFrame();
             frame.setSize(800, 600);
             frame.getContentPane().add(this);
