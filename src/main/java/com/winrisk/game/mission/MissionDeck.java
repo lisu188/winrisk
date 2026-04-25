@@ -13,9 +13,14 @@ import java.util.stream.Collectors;
 public class MissionDeck {
 
     private final List<Mission> missions;
-    private final Random random = new Random();
+    private final Random random;
 
     public MissionDeck(Map map, PlayerList players) {
+        this(map, players, new Random());
+    }
+
+    public MissionDeck(Map map, PlayerList players, Random random) {
+        this.random = random;
         missions = new ArrayList<>();
         missions.add(createTerritoryMission(24));
         missions.add(createFortifiedTerritoryMission(18, 2));

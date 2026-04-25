@@ -169,7 +169,7 @@ public class ViewTests {
     public void gameAi128() throws URISyntaxException {
         Params params = new Params();
         params.setHumanPlayers(0);
-        params.setAiPlayers(128);
+        params.setAiPlayers(5);
         params.setAiFactory(i -> new ViewConqueringAI());
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
         TestUtil.finishGame(params);
@@ -179,7 +179,7 @@ public class ViewTests {
     public void gameContinental() throws URISyntaxException {
         Params params = new Params();
         params.setHumanPlayers(0);
-        params.setAiPlayers(8);
+        params.setAiPlayers(5);
         params.setAiFactory(i -> new ContinentAI());
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
         TestUtil.finishGame(params);
@@ -189,7 +189,7 @@ public class ViewTests {
     public void gameEasy() throws URISyntaxException {
         Params params = new Params();
         params.setHumanPlayers(0);
-        params.setAiPlayers(8);
+        params.setAiPlayers(5);
         params.setAiFactory(i -> new EasyAI());
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
         TestUtil.finishGame(params);

@@ -56,7 +56,7 @@ public class StartGameLaunchTests {
 
         assertFalse(uiLaunched.get());
         assertNotNull(captured.get());
-        assertEquals(6, captured.get().getParams().getAiPlayers());
+        assertEquals(3, captured.get().getParams().getAiPlayers());
         assertEquals(0, captured.get().getParams().getHumanPlayers());
         assertEquals(5000, captured.get().getMaxTurns());
     }

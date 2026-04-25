@@ -3,6 +3,7 @@ package com.winrisk.game.serialization;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Continent;
 import com.winrisk.game.object.Field;
+import com.winrisk.game.rules.CardSymbol;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.view.Game;
 
@@ -126,10 +127,16 @@ public class MapSketch implements Serializable, Sketch {
         private final ArrayList<Integer> next;
 
         private final int x, y;
+        private final int fieldIndex;
+        private final String displayName;
+        private final CardSymbol cardSymbol;
 
         public FieldSketch(Field field, Map map) {
             x = field.getPoint().x;
             y = field.getPoint().y;
+            fieldIndex = field.getFieldIndex();
+            displayName = field.getDisplayName();
+            cardSymbol = field.getCardSymbol();
             next = new ArrayList<>();
             next.addAll(field.getNext().stream().map(nxt -> map.getFields().indexOf(nxt)).collect(Collectors.toList()));
         }
@@ -139,7 +146,11 @@ public class MapSketch implements Serializable, Sketch {
         }
 
         public Field recoverField() {
-            return new Field(new PointF(x, y));
+            Field field = new Field(new PointF(x, y));
+            field.setFieldIndex(fieldIndex);
+            field.setDisplayName(displayName);
+            field.setCardSymbol(cardSymbol);
+            return field;
         }
 
         @Override
@@ -151,6 +162,9 @@ public class MapSketch implements Serializable, Sketch {
 
             if (x != that.x) return false;
             if (y != that.y) return false;
+            if (fieldIndex != that.fieldIndex) return false;
+            if (displayName != null ? !displayName.equals(that.displayName) : that.displayName != null) return false;
+            if (cardSymbol != that.cardSymbol) return false;
             if (next != null ? !next.equals(that.next) : that.next != null) return false;
 
             return true;
@@ -161,6 +175,9 @@ public class MapSketch implements Serializable, Sketch {
             int result = next != null ? next.hashCode() : 0;
             result = 31 * result + x;
             result = 31 * result + y;
+            result = 31 * result + fieldIndex;
+            result = 31 * result + (displayName != null ? displayName.hashCode() : 0);
+            result = 31 * result + (cardSymbol != null ? cardSymbol.hashCode() : 0);
             return result;
         }
     }

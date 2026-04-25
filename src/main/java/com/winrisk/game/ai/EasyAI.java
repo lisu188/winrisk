@@ -1,7 +1,6 @@
 package com.winrisk.game.ai;
 
 import com.winrisk.game.cluster.FieldList;
-import com.winrisk.game.cluster.PatchList;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
 import com.winrisk.game.view.Game;
@@ -43,28 +42,16 @@ public class EasyAI implements PlayerInterface {
     @Override
     public void move(Game game) {
         Player player = game.getPlayer();
-        int tmpR = player.getCurrentReinforcements();
-        player.setRein(0);
-        PatchList pl = player.getPatchList(game);
-        int inc;
-        for (FieldList aPl : pl) {
-            inc = 0;
-            if (aPl.size() == 1) {
-                continue;
-            }
-            for (Field aPatch : aPl) {
-                inc += aPatch.getArmy() - 1;
-                aPatch.setArmy(1);
-                aPatch.setMin();
-            }
-            player.rein(inc);
-
-            while ((player.getCurrentReinforcements() > 0)
-                    ) {
-                aPl.getWeak(game).rein(1);
-            }
+        FieldList fields = player.getFields(game);
+        FieldList borders = player.getBorders(game);
+        if (fields.size() < 2) {
+            return;
         }
-        player.setRein(tmpR);
+        Field source = fields.getStrong(game);
+        Field destination = borders.isEmpty() ? fields.getWeak(game) : borders.getWeak(game);
+        if (source != destination && source.getArmy() > 1) {
+            game.maneuver(source, destination, source.getArmy() - 1);
+        }
     }
 
     @Override

@@ -1,13 +1,13 @@
 package com.winrisk.game.object;
 
 import com.winrisk.game.cluster.FieldList;
+import com.winrisk.game.rules.CardSymbol;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.view.Game;
 import com.winrisk.game.view.GameSurface;
 
 import java.awt.*;
 import java.io.Serializable;
-import java.util.Random;
 import java.util.stream.Collectors;
 
 public class Field implements Serializable {
@@ -15,6 +15,9 @@ public class Field implements Serializable {
     private final FieldList next;
     private final PointF point;
     private int army;
+    private int fieldIndex = -1;
+    private String displayName;
+    private CardSymbol cardSymbol;
     private Continent continent;
     private transient int min = 0;
     private Player player;
@@ -46,10 +49,6 @@ public class Field implements Serializable {
             }
         }
         return bor;
-    }
-
-    private int dice() {
-        return new Random().nextInt(6) + 1;
     }
 
     public void drawFields(GameSurface graphics) {
@@ -90,66 +89,7 @@ public class Field implements Serializable {
     }
 
     public void fight(Field def, Game game) {
-        if (!this.getNext().contains(def)) {
-            return;
-        }
-
-        if (this.player == def.getPlayer()) {
-            return;
-        }
-
-        if (this.army == 1) {
-            return;
-        }
-
-        int atts = this.army - 1;
-        if (atts > 3) {
-            atts = 3;
-        }
-
-        int defs = def.army;
-        if (defs > 2) {
-            defs = 2;
-        }
-
-        int[] attTab = new int[atts];
-        int[] defTab = new int[defs];
-
-        for (int i = 0; i < atts; i++) {
-            attTab[i] = dice();
-        }
-        for (int i = 0; i < defs; i++) {
-            defTab[i] = dice();
-        }
-
-        java.util.Arrays.sort(attTab);
-        java.util.Arrays.sort(defTab);
-
-        int count;
-        if (atts < defs) {
-            count = atts;
-        } else {
-            count = defs;
-        }
-        for (int i = 0; i < count; i++) {
-            if (attTab[atts - 1 - i] > defTab[defs - 1 - i]) {
-                def.army--;
-            } else {
-                this.army--;
-            }
-        }
-
-        if (def.army <= 0) {
-            player.obtainField(def);
-            player.addCard();
-            def.army = this.army - 1;
-            this.army = 1;
-            if (def.getPlayer().isDead(game)) {
-                player.takeCards(def.getPlayer(), game);
-            }
-        } else if (game.getParams().isAttackWithAll()) {
-            fight(def, game);
-        }
+        game.attack(this, def);
     }
 
     public int getArmy() {
@@ -158,6 +98,30 @@ public class Field implements Serializable {
 
     public void setArmy(int army) {
         this.army = army;
+    }
+
+    public int getFieldIndex() {
+        return fieldIndex;
+    }
+
+    public void setFieldIndex(int fieldIndex) {
+        this.fieldIndex = fieldIndex;
+    }
+
+    public String getDisplayName() {
+        return displayName == null ? "Territory " + (fieldIndex + 1) : displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public CardSymbol getCardSymbol() {
+        return cardSymbol == null ? CardSymbol.INFANTRY : cardSymbol;
+    }
+
+    public void setCardSymbol(CardSymbol cardSymbol) {
+        this.cardSymbol = cardSymbol;
     }
 
     public Continent getContinent() {

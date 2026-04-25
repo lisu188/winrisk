@@ -5,8 +5,11 @@ import com.winrisk.game.map.Map;
 
 import java.io.File;
 import java.io.Serializable;
+import java.util.Random;
 
 public class Params implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int aiPlayers;
 
     private boolean attackWithAll;
@@ -25,8 +28,12 @@ public class Params implements Serializable {
 
     private Long randomSeed;
 
+    private GameMode gameMode = GameMode.CLASSIC;
+
+    private RulesOptions rulesOptions = new RulesOptions();
+
     private boolean skynetMode;
-    private AiFactory aiFactory = i -> PlayerFactory.getRandomAI();
+    private AiFactory aiFactory = PlayerFactory::getDefaultAI;
 
     public Params() {
     }
@@ -131,5 +138,38 @@ public class Params implements Serializable {
 
     public void setRandomSeed(Long randomSeed) {
         this.randomSeed = randomSeed;
+    }
+
+    public Random createRandom() {
+        return randomSeed == null ? new Random() : new Random(randomSeed);
+    }
+
+    public GameMode getGameMode() {
+        return gameMode;
+    }
+
+    public void setGameMode(GameMode gameMode) {
+        if (gameMode == null) {
+            throw new IllegalArgumentException("Game mode cannot be null");
+        }
+        this.gameMode = gameMode;
+    }
+
+    public RulesOptions getRulesOptions() {
+        if (rulesOptions == null) {
+            rulesOptions = new RulesOptions();
+        }
+        return rulesOptions;
+    }
+
+    public void setRulesOptions(RulesOptions rulesOptions) {
+        if (rulesOptions == null) {
+            throw new IllegalArgumentException("Rules options cannot be null");
+        }
+        this.rulesOptions = rulesOptions;
+    }
+
+    public int getActivePlayerCount() {
+        return aiPlayers + humanPlayers;
     }
 }

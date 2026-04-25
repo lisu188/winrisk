@@ -1,5 +1,6 @@
 package com.winrisk.gui;
 
+import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.view.Game;
@@ -27,12 +28,16 @@ class HostGameWindow {
             return;
         }
         frame = new JFrame();
-        frame.setBounds(100, 100, 246, 180);
+        frame.setBounds(100, 100, 320, 320);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new GridLayout(0, 1, 0, 0));
 
         final JComboBox<File> mapBox = new JComboBox<>();
         frame.getContentPane().add(mapBox);
+
+        final JComboBox<GameMode> modeBox = new JComboBox<>(GameMode.values());
+        modeBox.setSelectedItem(GameMode.CLASSIC);
+        frame.getContentPane().add(modeBox);
 
         final JCheckBox skynetModeBox = new JCheckBox("Skynet Mode");
         frame.getContentPane().add(skynetModeBox);
@@ -43,6 +48,22 @@ class HostGameWindow {
         final JCheckBox fogOfWarCkeckBox = new JCheckBox("Fog of War");
         frame.getContentPane().add(fogOfWarCkeckBox);
 
+        final JCheckBox incrementalCardsBox = new JCheckBox("Incremental Card Values");
+        frame.getContentPane().add(incrementalCardsBox);
+
+        final JCheckBox expandedManeuverBox = new JCheckBox("Expanded Maneuver");
+        frame.getContentPane().add(expandedManeuverBox);
+
+        final JCheckBox attackCardRerollBox = new JCheckBox("Attack Card Reroll");
+        frame.getContentPane().add(attackCardRerollBox);
+
+        final JCheckBox commanderDieBox = new JCheckBox("Commander Die");
+        frame.getContentPane().add(commanderDieBox);
+
+        final JTextField seedField = new JTextField();
+        seedField.setToolTipText("Random seed");
+        frame.getContentPane().add(seedField);
+
         JPanel panel = new JPanel();
         frame.getContentPane().add(panel);
         panel.setLayout(new GridLayout(0, 2, 0, 0));
@@ -52,8 +73,18 @@ class HostGameWindow {
         panel_1.setLayout(new GridLayout(0, 2, 0, 0));
 
         final JSpinner aiPlayers = new JSpinner();
+        aiPlayers.setModel(new SpinnerNumberModel(2, 1, 4, 1));
         panel_1.add(aiPlayers);
         aiPlayers.setToolTipText("AI Players");
+        modeBox.addActionListener(event -> {
+            GameMode mode = (GameMode) modeBox.getSelectedItem();
+            int minimumAi = mode == GameMode.CLASSIC ? 1 : 2;
+            SpinnerNumberModel model = (SpinnerNumberModel) aiPlayers.getModel();
+            model.setMinimum(minimumAi);
+            if ((int) aiPlayers.getValue() < minimumAi) {
+                aiPlayers.setValue(minimumAi);
+            }
+        });
 
         JLabel lblAiPlayers = new JLabel("AI Players");
         lblAiPlayers.setHorizontalAlignment(SwingConstants.CENTER);
@@ -64,9 +95,17 @@ class HostGameWindow {
             try {
                 Params params = new Params();
                 params.setAiPlayers((int) aiPlayers.getValue());
+                params.setGameMode((GameMode) modeBox.getSelectedItem());
                 params.setFogOfWar(fogOfWarCkeckBox.isSelected());
                 params.setAttackWithAll(attackWithAllBox.isSelected());
                 params.setSkynetMode(skynetModeBox.isSelected());
+                params.getRulesOptions().setIncrementalCardSetValues(incrementalCardsBox.isSelected());
+                params.getRulesOptions().setExpandedManeuver(expandedManeuverBox.isSelected());
+                params.getRulesOptions().setAttackCardReroll(attackCardRerollBox.isSelected());
+                params.getRulesOptions().setCommanderDie(commanderDieBox.isSelected());
+                if (!seedField.getText().trim().isEmpty()) {
+                    params.setRandomSeed(Long.parseLong(seedField.getText().trim()));
+                }
                 params.setMap(((File) mapBox.getSelectedItem())
                         .getAbsolutePath());
                 new GamePanel(new Game(params));
