@@ -96,7 +96,7 @@ public class GuiTests {
     }
 
     @Test
-    public void hostGameWindowMapListIncludesDefaultAndCustomFiles() throws Exception {
+    public void hostGameWindowMapListIncludesBuiltinsAndCustomFiles() throws Exception {
         File folder = Files.createTempDirectory("winrisk-maps").toFile();
         File customMap = new File(folder, "custom.map");
         File nestedFolder = new File(folder, "nested");
@@ -106,11 +106,46 @@ public class GuiTests {
         nestedFolder.deleteOnExit();
         folder.deleteOnExit();
 
-        List<File> maps = HostGameWindow.getAvailableMaps(folder);
+        List<HostGameWindow.MapChoice> maps = HostGameWindow.getAvailableMaps(folder);
 
-        assertTrue(maps.stream().anyMatch(file -> "world.map".equals(file.getName())));
-        assertTrue(maps.contains(customMap));
-        assertFalse(maps.contains(nestedFolder));
+        for (String name : com.winrisk.game.map.BuiltinMaps.names()) {
+            assertTrue("missing builtin " + name, maps.stream()
+                    .anyMatch(choice -> choice.isBuiltin() && name.equals(choice.getBuiltinName())));
+        }
+        assertTrue(maps.stream().anyMatch(choice ->
+                !choice.isBuiltin() && customMap.equals(choice.getFile())));
+        assertFalse(maps.stream().anyMatch(choice ->
+                !choice.isBuiltin() && nestedFolder.equals(choice.getFile())));
+        // The world board stays the first, default selection.
+        assertTrue(maps.get(0).isBuiltin());
+        assertEquals("world", maps.get(0).getBuiltinName());
+        assertEquals("World", maps.get(0).toString());
+    }
+
+    @Test
+    public void mapChoiceAppliesBuiltinOrFileToParams() {
+        com.winrisk.game.data.Params builtinParams = new com.winrisk.game.data.Params();
+        HostGameWindow.MapChoice.builtin("pangaea").applyTo(builtinParams);
+        assertEquals("pangaea", builtinParams.getBuiltinMap());
+
+        com.winrisk.game.data.Params fileParams = new com.winrisk.game.data.Params();
+        File file = new File("maps/custom.map");
+        HostGameWindow.MapChoice.file(file).applyTo(fileParams);
+        assertNull(fileParams.getBuiltinMap());
+        assertEquals("custom.map", HostGameWindow.MapChoice.file(file).toString());
+    }
+
+    @Test
+    public void graphicsSurfaceIgnoresMissingBackground() {
+        BufferedImage img = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        GraphicsSurface surface = new GraphicsSurface();
+        JPanel panel = new JPanel();
+        panel.setSize(10, 10);
+        surface.setGraphics(panel, g);
+        // Built-in maps have no background image; drawing must be a no-op.
+        surface.drawBackground(null);
+        g.dispose();
     }
 
     @Test

@@ -32,6 +32,19 @@ unzip build/distributions/WinRisk-*.zip
 ./WinRisk-*/bin/WinRisk
 ```
 
+## Maps
+Several boards ship with the game and can be selected in the host window:
+
+- **World** – the classic 42-territory world board.
+- **Pangaea** – the Permian–Triassic supercontinent; cratons and terranes in six regions wrapped around the Tethys Sea.
+- **Laurasia** – the northern supercontinent, from Laurentia across Baltica and Siberia to East Asia.
+- **Gondwana** – the southern supercontinent of South America, Africa, Arabia, India, Antarctica and Australia.
+- **Rodinia** – the Neoproterozoic supercontinent with Laurentia at its core.
+
+Custom maps created in the editor can be placed in a `maps/` folder next to the
+application and appear in the map list automatically. Headless play accepts a
+built-in name or a file path via `--map=` (e.g. `--map=gondwana`).
+
 ## Saving and loading games
 A game in progress can be saved and resumed. Closing the game window offers to
 save the current game to a file; the start menu's **LOAD GAME** option restores

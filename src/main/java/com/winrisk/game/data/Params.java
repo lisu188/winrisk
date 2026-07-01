@@ -1,6 +1,7 @@
 package com.winrisk.game.data;
 
 import com.winrisk.game.ai.PlayerFactory;
+import com.winrisk.game.map.BuiltinMaps;
 import com.winrisk.game.map.Map;
 
 import java.io.File;
@@ -19,6 +20,8 @@ public class Params implements Serializable {
     private int humanPlayers = 1;
 
     private transient String map;
+
+    private String builtinMap;
 
     private boolean randomMap;
 
@@ -68,6 +71,9 @@ public class Params implements Serializable {
                     ? new com.winrisk.game.map.MapGenerator().generate(randomFields, randomContinents)
                     : new com.winrisk.game.map.MapGenerator(randomSeed).generate(randomFields, randomContinents);
         }
+        if (builtinMap != null) {
+            return BuiltinMaps.byName(builtinMap);
+        }
         if (map == null) {
             try {
                 map = new File(Map.class.getResource("world.map").toURI())
@@ -106,6 +112,19 @@ public class Params implements Serializable {
 
     public void setMap(String map) {
         this.map = map;
+    }
+
+    public String getBuiltinMap() {
+        return builtinMap;
+    }
+
+    /**
+     * Selects one of the boards shipped with the game by name (see
+     * {@link BuiltinMaps#names()}). Takes precedence over a file path set via
+     * {@link #setMap(String)}.
+     */
+    public void setBuiltinMap(String builtinMap) {
+        this.builtinMap = builtinMap;
     }
 
     public void setRandomMap(boolean randomMap) {

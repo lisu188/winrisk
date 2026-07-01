@@ -2,6 +2,7 @@ package com.winrisk.gui;
 
 import com.winrisk.game.Play;
 import com.winrisk.game.data.GameMode;
+import com.winrisk.game.map.BuiltinMaps;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.view.Editor;
 import com.winrisk.game.view.Game;
@@ -108,7 +109,12 @@ public class StartGame extends JFrame {
             } else if (arg.startsWith("--max-turns=")) {
                 config.setMaxTurns(parsePositiveInt(arg, "--max-turns"));
             } else if (arg.startsWith("--map=")) {
-                config.getParams().setMap(parseRequiredValue(arg, "--map"));
+                String value = parseRequiredValue(arg, "--map");
+                if (BuiltinMaps.isBuiltin(value)) {
+                    config.getParams().setBuiltinMap(value);
+                } else {
+                    config.getParams().setMap(value);
+                }
             } else if (arg.startsWith("--mode=")) {
                 config.getParams().setGameMode(GameMode.fromCli(parseRequiredValue(arg, "--mode")));
             } else if (arg.startsWith("--seed=")) {

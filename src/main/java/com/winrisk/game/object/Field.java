@@ -120,6 +120,14 @@ public class Field implements Serializable {
         return cardSymbol == null ? CardSymbol.INFANTRY : cardSymbol;
     }
 
+    /**
+     * @return whether a card symbol has been explicitly assigned, as opposed
+     * to the {@link #getCardSymbol()} fallback.
+     */
+    public boolean hasCardSymbol() {
+        return cardSymbol != null;
+    }
+
     public void setCardSymbol(CardSymbol cardSymbol) {
         this.cardSymbol = cardSymbol;
     }

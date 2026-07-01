@@ -56,9 +56,21 @@ final class WorldTerritoryMetadata {
         for (int i = 0; i < map.getFields().size(); i++) {
             Field field = map.getFields().get(i);
             field.setFieldIndex(i);
-            field.setDisplayName(displayName(i, map.getFields().size()));
-            field.setCardSymbol(symbol(i));
+            // Only fill in metadata for territories without authored content, so
+            // maps that ship their own names and symbols (e.g. the historical
+            // supercontinent boards) keep them across save/load.
+            if (!hasAuthoredName(field)) {
+                field.setDisplayName(displayName(i, map.getFields().size()));
+            }
+            if (!field.hasCardSymbol()) {
+                field.setCardSymbol(symbol(i));
+            }
         }
+    }
+
+    private static boolean hasAuthoredName(Field field) {
+        String name = field.getDisplayName();
+        return name != null && !name.matches("Territory \\d+");
     }
 
     private static String displayName(int index, int fieldCount) {

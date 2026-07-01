@@ -36,6 +36,7 @@ public class UiSmokeScreenshotTests {
     private static final String[] SCREENSHOT_FILES = {
             "start-menu.png",
             "game-board.png",
+            "pangaea-board.png",
             "gameplay-click-emulation.png"
     };
 
@@ -68,6 +69,26 @@ public class UiSmokeScreenshotTests {
 
             assertImageHasContent("game board", image, 16);
             writePng(image, "game-board.png");
+        } finally {
+            restoreHeadless(originalHeadless);
+        }
+    }
+
+    @Test
+    public void writesPangaeaBoardScreenshotForInspection() throws Exception {
+        String originalHeadless = forceHeadless();
+        try {
+            Params params = new Params();
+            params.setHumanPlayers(0);
+            params.setAiPlayers(3);
+            params.setGameMode(GameMode.CLASSIC);
+            params.setBuiltinMap("pangaea");
+            params.setRandomSeed(1234L);
+            GamePanel panel = new GamePanel(new Game(params));
+            BufferedImage image = render(panel, 800, 600);
+
+            assertImageHasContent("pangaea board", image, 16);
+            writePng(image, "pangaea-board.png");
         } finally {
             restoreHeadless(originalHeadless);
         }

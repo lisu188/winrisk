@@ -45,6 +45,18 @@ public class StartGameLaunchTests {
     }
 
     @Test
+    public void buildHeadlessConfigResolvesBuiltinMapNames() {
+        StartGame.HeadlessConfig builtin = StartGame.buildHeadlessConfig(new String[]{
+                "--headless-play", "--map=Gondwana"});
+        assertEquals("Gondwana", builtin.getParams().getBuiltinMap());
+        assertEquals(26, builtin.getParams().loadMap().getFields().size());
+
+        StartGame.HeadlessConfig file = StartGame.buildHeadlessConfig(new String[]{
+                "--headless-play", "--map=maps/custom.map"});
+        assertNull(file.getParams().getBuiltinMap());
+    }
+
+    @Test
     public void buildHeadlessConfigRejectsBlankRequiredValues() {
         assertInvalidConfig("--map=");
         assertInvalidConfig("--map=   ");

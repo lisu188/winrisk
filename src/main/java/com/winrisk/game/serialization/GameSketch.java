@@ -88,6 +88,7 @@ public class GameSketch implements Sketch {
         public int humanPlayers;
         public int aiPlayers;
         public Long randomSeed;
+        public String builtinMap;
 
         public ParamsData() {
         }
@@ -105,6 +106,7 @@ public class GameSketch implements Sketch {
             this.humanPlayers = source.getHumanPlayers();
             this.aiPlayers = source.getAiPlayers();
             this.randomSeed = source.getRandomSeed();
+            this.builtinMap = source.getBuiltinMap();
         }
 
         public Params toParams() {
@@ -122,6 +124,7 @@ public class GameSketch implements Sketch {
             params.setHumanPlayers(humanPlayers);
             params.setAiPlayers(aiPlayers);
             params.setRandomSeed(randomSeed);
+            params.setBuiltinMap(builtinMap);
             return params;
         }
     }
