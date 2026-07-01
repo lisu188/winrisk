@@ -46,11 +46,12 @@ public class UiSmokeScreenshotTests {
             JPanel menu = StartGame.createMenuPanel(() -> {
             }, () -> {
             }, () -> {
+            }, () -> {
             });
 
             BufferedImage image = render(menu, 200, 200);
 
-            assertButtonLabels(menu, "HOST GAME", "NEW MAP", "LOAD MAP");
+            assertButtonLabels(menu, "HOST GAME", "NEW MAP", "LOAD MAP", "LOAD GAME");
             assertImageHasContent("start menu", image, 4);
             writePng(image, "start-menu.png");
         } finally {

@@ -50,4 +50,23 @@ public class PlayerFactory {
     public static PlayerInterface getDefaultAI(int index) {
         return buildClass(AI.get(Math.floorMod(index, AI.size())));
     }
+
+    /**
+     * Rebuilds a player interface from its concrete class name. Used when
+     * restoring a saved game so each seat keeps its original controller.
+     */
+    public static PlayerInterface byClassName(String className) {
+        if (className == null) {
+            return getHuman();
+        }
+        try {
+            Class<?> clas = Class.forName(className);
+            if (!PlayerInterface.class.isAssignableFrom(clas)) {
+                throw new IllegalArgumentException("Not a PlayerInterface: " + className);
+            }
+            return (PlayerInterface) buildClass(clas.asSubclass(PlayerInterface.class));
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Unknown player interface: " + className, e);
+        }
+    }
 }

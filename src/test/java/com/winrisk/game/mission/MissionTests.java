@@ -42,7 +42,7 @@ public class MissionTests {
         Game game = TestUtil.createNewGame();
         Player hunter = game.getPlayers().get(0);
         Player prey = game.getPlayers().get(1);
-        Mission mission = MissionDeck.createEliminationMission(prey);
+        Mission mission = MissionDeck.createEliminationMission(prey, 1);
 
         // While the target still holds territory the mission is not complete.
         assertFalse(mission.isCompleted(game, hunter));
@@ -59,7 +59,7 @@ public class MissionTests {
     public void eliminationMissionFallsBackToTerritoriesWhenTargetingSelf() throws Exception {
         Game game = TestUtil.createNewGame();
         Player player = game.getPlayers().get(0);
-        Mission mission = MissionDeck.createEliminationMission(player);
+        Mission mission = MissionDeck.createEliminationMission(player, 0);
 
         // A self-targeting mission cannot be won by elimination; it requires 24 territories.
         assertFalse(mission.isCompleted(game, player));
