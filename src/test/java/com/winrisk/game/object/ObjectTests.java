@@ -10,6 +10,9 @@ import com.winrisk.game.cluster.PatchList;
 import org.junit.Test;
 
 import java.awt.Color;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -133,6 +136,35 @@ public class ObjectTests {
         continent.removeField(a);
         assertFalse(continent.getFields().contains(a));
         assertNull(a.getContinent());
+    }
+
+    @Test
+    public void playerEqualsAndHashCodeHonorContract() {
+        Player p = new Player(Color.RED, PlayerFactory.getHuman());
+        Player copy = new Player(p.getColor(), PlayerFactory.getRandomAI());
+        Player other = new Player(Color.BLUE, PlayerFactory.getHuman());
+
+        // Equal players must share a hash code so hash-based collections work.
+        assertEquals(p, copy);
+        assertEquals(p.hashCode(), copy.hashCode());
+
+        HashSet<Player> set = new HashSet<>();
+        set.add(p);
+        assertTrue("HashSet lookup must find an equal player", set.contains(copy));
+        assertFalse(set.contains(other));
+
+        Map<Player, String> map = new HashMap<>();
+        map.put(p, "red");
+        assertEquals("red", map.get(copy));
+    }
+
+    @Test
+    public void playerHashCodeToleratesNullColor() {
+        Player nullColor = new Player(null, PlayerFactory.getHuman());
+        // Must not throw and must stay consistent with equals.
+        assertEquals(nullColor.hashCode(), nullColor.hashCode());
+        assertEquals(nullColor, new Player(null, PlayerFactory.getRandomAI()));
+        assertEquals(nullColor.hashCode(), new Player(null, PlayerFactory.getHuman()).hashCode());
     }
 
     @Test(expected = RuntimeException.class)
