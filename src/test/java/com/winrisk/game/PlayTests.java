@@ -46,6 +46,24 @@ public class PlayTests {
     }
 
     @Test
+    public void headlessPlayReportsDrawWhenNoWinnerWithinTurnLimit() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        Params params = new Params();
+        params.setHumanPlayers(0);
+        params.setAiPlayers(3);
+        params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
+        // Players that never attack can never be eliminated, so the game cannot
+        // end within the turn limit: this must be reported as a draw, not crash.
+        params.setAiFactory(index -> new PassiveRecorderAI());
+
+        Play.Result result = new Play(params, 5).playResult();
+
+        assertTrue(result.isDraw());
+        assertEquals(null, result.getWinner());
+        assertTrue(result.getWinReason().contains("turn limit"));
+    }
+
+    @Test
     public void headlessPlayPrefersAggressiveAiWhenMixedWithPassiveOpponents() throws Exception {
         System.setProperty("java.awt.headless", "true");
         Params params = new Params();
