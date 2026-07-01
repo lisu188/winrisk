@@ -2,7 +2,6 @@ package com.winrisk.game.ai;
 
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
-import com.winrisk.game.rules.ManeuverChoice;
 import com.winrisk.game.rules.RiskCard;
 import com.winrisk.game.view.Game;
 
@@ -62,10 +61,6 @@ public interface PlayerInterface {
 
     default int chooseOccupationTroops(Game game, Field source, Field target, int minimum, int maximum) {
         return maximum;
-    }
-
-    default ManeuverChoice chooseManeuver(Game game, Player player) {
-        return null;
     }
 
     default Field chooseHeadquarters(Game game, Player player, List<Field> ownedTerritories) {
