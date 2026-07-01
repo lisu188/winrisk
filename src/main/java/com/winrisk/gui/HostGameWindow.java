@@ -2,14 +2,12 @@ package com.winrisk.gui;
 
 import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.Params;
-import com.winrisk.game.map.Map;
+import com.winrisk.game.map.BuiltinMaps;
 import com.winrisk.game.view.Game;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +34,7 @@ class HostGameWindow {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.getContentPane().setLayout(new GridLayout(0, 1, 0, 0));
 
-        final JComboBox<File> mapBox = new JComboBox<>();
+        final JComboBox<MapChoice> mapBox = new JComboBox<>();
         frame.getContentPane().add(mapBox);
 
         final JComboBox<GameMode> modeBox = new JComboBox<>(GameMode.values());
@@ -110,8 +108,7 @@ class HostGameWindow {
                 if (!seedField.getText().trim().isEmpty()) {
                     params.setRandomSeed(Long.parseLong(seedField.getText().trim()));
                 }
-                params.setMap(((File) mapBox.getSelectedItem())
-                        .getAbsolutePath());
+                ((MapChoice) mapBox.getSelectedItem()).applyTo(params);
                 new GamePanel(new Game(params));
                 frame.dispose();
             } catch (Exception e) {
@@ -123,44 +120,75 @@ class HostGameWindow {
         });
         frame.getContentPane().add(startButton);
 
-        for (File map : getAvailableMaps(new File("maps"))) {
-            mapBox.addItem(displayNameFile(map));
+        for (MapChoice choice : getAvailableMaps(new File("maps"))) {
+            mapBox.addItem(choice);
         }
     }
 
-    static List<File> getAvailableMaps(File folder) {
-        List<File> maps = new ArrayList<>();
-        maps.add(getDefaultMap());
+    static List<MapChoice> getAvailableMaps(File folder) {
+        List<MapChoice> maps = new ArrayList<>();
+        for (String name : BuiltinMaps.names()) {
+            maps.add(MapChoice.builtin(name));
+        }
         File[] customMaps = folder == null ? null : folder.listFiles();
         if (customMaps != null) {
             for (File file : customMaps) {
                 if (file.isFile()) {
-                    maps.add(file);
+                    maps.add(MapChoice.file(file));
                 }
             }
         }
         return maps;
     }
 
-    private static File getDefaultMap() {
-        try {
-            URL resource = Map.class.getResource("world.map");
-            if (resource == null) {
-                throw new IllegalStateException("Default world map resource is unavailable");
-            }
-            return new File(resource.toURI());
-        } catch (URISyntaxException e) {
-            throw new IllegalStateException("Default world map resource is unavailable", e);
-        }
-    }
+    /**
+     * A selectable entry in the map picker: either one of the built-in boards
+     * or a custom map file from the {@code maps/} folder.
+     */
+    static final class MapChoice {
+        private final String builtinName;
+        private final File file;
 
-    private static File displayNameFile(File file) {
-        return new File(file.getAbsolutePath()) {
-            @Override
-            public String toString() {
-                return getName();
+        private MapChoice(String builtinName, File file) {
+            this.builtinName = builtinName;
+            this.file = file;
+        }
+
+        static MapChoice builtin(String name) {
+            return new MapChoice(name, null);
+        }
+
+        static MapChoice file(File file) {
+            return new MapChoice(null, file);
+        }
+
+        boolean isBuiltin() {
+            return builtinName != null;
+        }
+
+        String getBuiltinName() {
+            return builtinName;
+        }
+
+        File getFile() {
+            return file;
+        }
+
+        void applyTo(Params params) {
+            if (builtinName != null) {
+                params.setBuiltinMap(builtinName);
+            } else {
+                params.setMap(file.getAbsolutePath());
             }
-        };
+        }
+
+        @Override
+        public String toString() {
+            if (builtinName != null) {
+                return Character.toUpperCase(builtinName.charAt(0)) + builtinName.substring(1);
+            }
+            return file.getName();
+        }
     }
 
     public void setVisible(boolean arg0) {

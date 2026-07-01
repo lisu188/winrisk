@@ -18,6 +18,9 @@ public class GraphicsSurface implements GameSurface {
     @Override
     public void drawBackground(byte[] background) {
         if (cache == null) {
+            if (background == null) {
+                return;
+            }
             ByteArrayInputStream bis = new ByteArrayInputStream(background);
             try {
                 cache = ImageIO.read(bis);
