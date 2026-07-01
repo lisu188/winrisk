@@ -33,8 +33,10 @@ public class Play {
         int maxPhaseSteps = maxTurns * Math.max(1, game.getPlayers().size()) * 3;
         while (!game.end()) {
             if (phaseSteps++ >= maxPhaseSteps) {
-                throw new IllegalStateException(
-                        "Game did not finish within " + maxTurns + " turns");
+                // No player achieved a win condition within the turn limit:
+                // report a draw rather than crashing the simulation.
+                return new Result(params, completedTurns, null,
+                        "draw: reached the turn limit of " + maxTurns + " turns");
             }
             if (game.getPhase() == com.winrisk.game.data.GamePhase.MOVE) {
                 completedTurns++;
@@ -90,6 +92,14 @@ public class Play {
 
         public Player getWinner() {
             return winner;
+        }
+
+        /**
+         * @return {@code true} when the game ended without a winner because the
+         * turn limit was reached (a stalemate/draw).
+         */
+        public boolean isDraw() {
+            return winner == null;
         }
 
         public String getWinReason() {
