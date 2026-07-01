@@ -1,6 +1,9 @@
 package com.winrisk.gui;
 
+import com.winrisk.game.ai.InteractiveHuman;
 import com.winrisk.game.data.MotionEvent;
+import com.winrisk.game.object.Player;
+import com.winrisk.game.view.Game;
 import com.winrisk.game.view.Viewable;
 
 import javax.swing.*;
@@ -26,12 +29,25 @@ public class GamePanel extends JPanel {
         this.viewable = viewable;
         if (!Boolean.getBoolean("java.awt.headless")
                 && !GraphicsEnvironment.isHeadless()) {
+            installHumanChoiceProviders(viewable);
             JFrame frame = new JFrame();
             frame.setSize(800, 600);
             frame.getContentPane().add(this);
             frame.setResizable(false);
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setVisible(true);
+        }
+    }
+
+    private void installHumanChoiceProviders(Viewable viewable) {
+        if (!(viewable instanceof Game)) {
+            return;
+        }
+        SwingHumanChoiceProvider provider = new SwingHumanChoiceProvider();
+        for (Player player : ((Game) viewable).getPlayers()) {
+            if (player.getPlayerInterface() instanceof InteractiveHuman) {
+                ((InteractiveHuman) player.getPlayerInterface()).setChoiceProvider(provider);
+            }
         }
     }
 

@@ -23,11 +23,7 @@ public class PlayerFactory {
                 .filter(clas -> clas
                         .isAnnotationPresent(ArtificialIntelligence.class))
                 .collect(Collectors.toList());
-        HUMAN = all
-                .stream()
-                .filter(clas -> !clas
-                        .isAnnotationPresent(ArtificialIntelligence.class))
-                .collect(Collectors.toList()).get(0);
+        HUMAN = InteractiveHuman.class;
     }
 
     private static <T> T buildClass(Class<? extends T> clas) {
