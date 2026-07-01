@@ -56,13 +56,12 @@ public class MissionDeck {
                 .count() >= continentCount);
     }
 
-    private Mission createEliminationMission(Player target) {
+    static Mission createEliminationMission(Player target) {
         String description = "Eliminate the player with color " + target.getColor();
         return new Mission(description, (game, player) -> {
+            // A player can never eliminate themselves, so the official fallback
+            // objective for a self-targeting mission is to capture 24 territories.
             if (player.equals(target)) {
-                return false;
-            }
-            if (target.isDead(game)) {
                 return player.getFieldState(game) >= 24;
             }
             return target.isDead(game);
