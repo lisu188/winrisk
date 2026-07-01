@@ -27,10 +27,31 @@ public class MissionDeck {
         missions.add(createContinentMission(2));
         missions.add(createContinentMission(3));
         missions.add(createFortifiedTerritoryMission(15, 3));
-        for (Player target : players) {
-            missions.add(createEliminationMission(target));
+        for (int i = 0; i < players.size(); i++) {
+            missions.add(createEliminationMission(players.get(i), i));
         }
         Collections.shuffle(missions, random);
+    }
+
+    /**
+     * Rebuilds a mission from its serializable {@link MissionSpec}, resolving
+     * any player reference against the supplied roster. Used when loading a
+     * saved game.
+     */
+    public static Mission fromSpec(MissionSpec spec, PlayerList players) {
+        switch (spec.getKind()) {
+            case TERRITORY:
+                return createTerritoryMission(spec.getTerritories());
+            case FORTIFIED_TERRITORY:
+                return createFortifiedTerritoryMission(spec.getTerritories(), spec.getMinimumArmies());
+            case CONTINENTS:
+                return createContinentMission(spec.getContinentCount());
+            case ELIMINATION:
+                int index = spec.getEliminationTargetIndex();
+                return createEliminationMission(players.get(index), index);
+            default:
+                throw new IllegalArgumentException("Unknown mission kind: " + spec.getKind());
+        }
     }
 
     public Mission draw(Player player) {
@@ -48,15 +69,15 @@ public class MissionDeck {
         return mission;
     }
 
-    private Mission createContinentMission(int continentCount) {
+    private static Mission createContinentMission(int continentCount) {
         String description = "Conquer " + continentCount + " continents.";
         return new Mission(description, (game, player) -> game.getMap().getContinents()
                 .stream()
                 .filter(continent -> player.equals(continent.getPlayer()))
-                .count() >= continentCount);
+                .count() >= continentCount, null, MissionSpec.continents(continentCount));
     }
 
-    static Mission createEliminationMission(Player target) {
+    static Mission createEliminationMission(Player target, int targetIndex) {
         String description = "Eliminate the player with color " + target.getColor();
         return new Mission(description, (game, player) -> {
             // A player can never eliminate themselves, so the official fallback
@@ -65,20 +86,21 @@ public class MissionDeck {
                 return player.getFieldState(game) >= 24;
             }
             return target.isDead(game);
-        }, target);
+        }, target, MissionSpec.elimination(targetIndex));
     }
 
-    private Mission createFortifiedTerritoryMission(int territories, int minimumArmies) {
+    private static Mission createFortifiedTerritoryMission(int territories, int minimumArmies) {
         String description = "Conquer " + territories + " territories with at least "
                 + minimumArmies + " armies on each.";
         return new Mission(description, (game, player) -> game.getFields().stream()
                 .filter(field -> player.equals(field.getPlayer()))
                 .filter(field -> field.getArmy() >= minimumArmies)
-                .count() >= territories);
+                .count() >= territories, null, MissionSpec.fortifiedTerritory(territories, minimumArmies));
     }
 
-    private Mission createTerritoryMission(int territories) {
+    private static Mission createTerritoryMission(int territories) {
         String description = "Conquer " + territories + " territories.";
-        return new Mission(description, (game, player) -> player.getFieldState(game) >= territories);
+        return new Mission(description, (game, player) -> player.getFieldState(game) >= territories,
+                null, MissionSpec.territory(territories));
     }
 }

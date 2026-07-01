@@ -16,16 +16,23 @@ import com.winrisk.game.object.Player;
 import com.winrisk.game.rules.CombatResolver;
 import com.winrisk.game.rules.CombatResult;
 import com.winrisk.game.rules.OfficialSetup;
+import com.winrisk.game.rules.RiskCard;
 import com.winrisk.game.rules.RiskCardService;
 import com.winrisk.game.rules.WinConditionEvaluator;
+import com.winrisk.game.serialization.GameSketch;
+import com.winrisk.game.serialization.JavaSerializer;
 import com.winrisk.game.serialization.MapSketch;
+import com.winrisk.game.serialization.Saveable;
+import com.winrisk.game.serialization.Serializer;
+import com.winrisk.game.serialization.Sketch;
 import com.winrisk.game.util.Colors;
 import com.winrisk.game.util.PointF;
 
 import java.awt.Color;
+import java.util.List;
 import java.util.Random;
 
-public class Game implements FieldListener, Viewable {
+public class Game implements FieldListener, Viewable, Saveable {
     private final FieldDetector fieldDetector = new FieldDetector(this);
     private int curPlayer;
     private GamePhase curState;
@@ -45,6 +52,7 @@ public class Game implements FieldListener, Viewable {
     private WinConditionEvaluator winConditionEvaluator;
     private boolean maneuverUsed;
     private boolean commanderDieUsed;
+    private final Serializer serializer = new JavaSerializer();
 
     public Game(Params params) {
         this.params = params;
@@ -54,6 +62,13 @@ public class Game implements FieldListener, Viewable {
         this.winConditionEvaluator = new WinConditionEvaluator();
         this.map = params.loadMap();
         startNewGame();
+    }
+
+    /**
+     * Creates an uninitialised game with no setup performed. Used when loading
+     * a saved game, where {@link #fromSketch(Sketch)} restores all state.
+     */
+    public Game() {
     }
 
     public boolean end() {
@@ -177,6 +192,10 @@ public class Game implements FieldListener, Viewable {
 
     public void setCommanderDieUsed(boolean commanderDieUsed) {
         this.commanderDieUsed = commanderDieUsed;
+    }
+
+    public boolean isManeuverUsed() {
+        return maneuverUsed;
     }
 
     private void incState() {
@@ -381,7 +400,102 @@ public class Game implements FieldListener, Viewable {
 
     @Override
     public void onSave(String path) {
-        throw new UnsupportedOperationException();
+        save(path);
+    }
+
+    public void save(String path) {
+        serializer.save(this, path);
+    }
+
+    public void load(String path) {
+        serializer.load(this, path);
+    }
+
+    /**
+     * Loads a previously saved game from the given path.
+     */
+    public static Game loadGame(String path) {
+        Game game = new Game();
+        game.load(path);
+        return game;
+    }
+
+    @Override
+    public Sketch toSketch() {
+        return new GameSketch(this);
+    }
+
+    @Override
+    public Class<? extends Sketch> getSketchClass() {
+        return GameSketch.class;
+    }
+
+    @Override
+    public void fromSketch(Sketch sketch) {
+        GameSketch gs = (GameSketch) sketch;
+        this.params = gs.params.toParams();
+        this.random = params.createRandom();
+        this.cardService = new RiskCardService(random, params.getRulesOptions());
+        this.combatResolver = new CombatResolver(random);
+        this.winConditionEvaluator = new WinConditionEvaluator();
+        this.map = new Map();
+        this.map.fromSketch(gs.map);
+
+        this.players = new PlayerList();
+        for (GameSketch.PlayerData pd : gs.players) {
+            Player player = new Player(new Color(pd.colorRgb, true),
+                    PlayerFactory.byClassName(pd.interfaceClass));
+            player.setNeutral(pd.neutral);
+            player.setRein(pd.reinforcements);
+            player.setConqueredTerritoryThisTurn(pd.conqueredTerritoryThisTurn);
+            for (GameSketch.CardData cd : pd.cards) {
+                player.addCard(buildCard(cd));
+            }
+            players.add(player);
+        }
+
+        List<Field> fields = map.getFields();
+        for (int i = 0; i < gs.players.size(); i++) {
+            GameSketch.PlayerData pd = gs.players.get(i);
+            Player player = players.get(i);
+            if (pd.mission != null) {
+                player.setMission(MissionDeck.fromSpec(pd.mission, players));
+            }
+            if (pd.headquartersIndex >= 0) {
+                player.setHeadquarters(fields.get(pd.headquartersIndex));
+            }
+        }
+
+        for (int i = 0; i < fields.size(); i++) {
+            Field field = fields.get(i);
+            field.setArmy(gs.fieldArmy[i]);
+            field.setPlayer(gs.fieldOwner[i] >= 0 ? players.get(gs.fieldOwner[i]) : null);
+        }
+
+        this.neutralPlayer = gs.neutralPlayerIndex >= 0
+                ? players.get(gs.neutralPlayerIndex) : null;
+
+        cardService.setTradeCount(gs.tradeCount);
+        cardService.getDeck().restore(buildCards(gs.drawPile), buildCards(gs.discardPile));
+
+        this.curPlayer = gs.curPlayer;
+        this.curState = gs.phase;
+        this.commanderDieUsed = gs.commanderDieUsed;
+        this.maneuverUsed = gs.maneuverUsed;
+    }
+
+    private java.util.List<RiskCard> buildCards(java.util.List<GameSketch.CardData> data) {
+        java.util.List<RiskCard> cards = new java.util.ArrayList<>();
+        for (GameSketch.CardData cd : data) {
+            cards.add(buildCard(cd));
+        }
+        return cards;
+    }
+
+    private RiskCard buildCard(GameSketch.CardData cd) {
+        return cd.fieldIndex < 0
+                ? RiskCard.wild()
+                : RiskCard.territory(map.getFields().get(cd.fieldIndex));
     }
 
     @Override

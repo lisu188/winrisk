@@ -32,6 +32,14 @@ unzip build/distributions/WinRisk-*.zip
 ./WinRisk-*/bin/WinRisk
 ```
 
+## Saving and loading games
+A game in progress can be saved and resumed. Closing the game window offers to
+save the current game to a file; the start menu's **LOAD GAME** option restores
+a previously saved game and continues play from where it left off. Saved games
+capture the full board, every player's territories, armies, cards, secret
+missions and capitals, the risk-card deck, and the current turn and phase. Saved
+games are stored with the same JSON format used for map files.
+
 ## Tests
 Execute tests and produce coverage data separately with:
 

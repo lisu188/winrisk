@@ -62,4 +62,29 @@ public class RiskDeck {
     public int size() {
         return drawPile.size();
     }
+
+    /**
+     * @return the draw pile in draw order (next card first). Used for saving.
+     */
+    public List<RiskCard> getDrawPile() {
+        return new ArrayList<>(drawPile);
+    }
+
+    /**
+     * @return the discard pile. Used for saving.
+     */
+    public List<RiskCard> getDiscardPile() {
+        return new ArrayList<>(discardPile);
+    }
+
+    /**
+     * Replaces the draw and discard piles wholesale. Used when loading a saved
+     * game. The draw pile keeps the supplied order (next card first).
+     */
+    public void restore(Collection<RiskCard> draw, Collection<RiskCard> discard) {
+        drawPile.clear();
+        discardPile.clear();
+        drawPile.addAll(draw);
+        discardPile.addAll(discard);
+    }
 }

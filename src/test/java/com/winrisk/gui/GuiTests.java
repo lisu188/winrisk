@@ -162,8 +162,9 @@ public class GuiTests {
 
         startGame.handleNewMapAction();
         startGame.handleLoadMapAction();
+        startGame.handleLoadGameAction();
 
-        assertEquals(2, startGame.getFilePathCallCount);
+        assertEquals(3, startGame.getFilePathCallCount);
     }
 
     @SuppressWarnings("unchecked")

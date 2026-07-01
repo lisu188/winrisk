@@ -4,6 +4,7 @@ import com.winrisk.game.Play;
 import com.winrisk.game.data.GameMode;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.view.Editor;
+import com.winrisk.game.view.Game;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -28,12 +29,14 @@ public class StartGame extends JFrame {
                     StartGame.this.dispose();
                 },
                 this::handleNewMapAction,
-                this::handleLoadMapAction));
+                this::handleLoadMapAction,
+                this::handleLoadGameAction));
     }
 
     static JPanel createMenuPanel(Runnable hostGameAction,
                                   Runnable newMapAction,
-                                  Runnable loadMapAction) {
+                                  Runnable loadMapAction,
+                                  Runnable loadGameAction) {
         JPanel contentPane = new JPanel();
         contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
         contentPane.setLayout(new GridLayout(0, 1, 0, 0));
@@ -41,6 +44,7 @@ public class StartGame extends JFrame {
         JButton buttonHostGame = new JButton("HOST GAME");
         JButton btnNewMap = new JButton("NEW MAP");
         JButton button = new JButton("LOAD MAP");
+        JButton btnLoadGame = new JButton("LOAD GAME");
 
         buttonHostGame.addActionListener(arg0 -> EventQueue.invokeLater(hostGameAction));
 
@@ -48,9 +52,12 @@ public class StartGame extends JFrame {
 
         button.addActionListener(arg0 -> EventQueue.invokeLater(loadMapAction));
 
+        btnLoadGame.addActionListener(arg0 -> EventQueue.invokeLater(loadGameAction));
+
         contentPane.add(buttonHostGame);
         contentPane.add(btnNewMap);
         contentPane.add(button);
+        contentPane.add(btnLoadGame);
         return contentPane;
     }
 
@@ -177,6 +184,19 @@ public class StartGame extends JFrame {
             new GamePanel(new Editor(file));
         } catch (Exception e) {
             handleException("Chosen map file was not a correct map file.",
+                    "Invalid file format.", e);
+        }
+    }
+
+    void handleLoadGameAction() {
+        try {
+            final String file = getFilePath();
+            if (file == null) {
+                return;
+            }
+            new GamePanel(Game.loadGame(file));
+        } catch (Exception e) {
+            handleException("Chosen file was not a valid saved game.",
                     "Invalid file format.", e);
         }
     }

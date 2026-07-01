@@ -32,6 +32,10 @@ public class RiskCardService {
         return tradeCount;
     }
 
+    public void setTradeCount(int tradeCount) {
+        this.tradeCount = tradeCount;
+    }
+
     public void resetDrawDeck(Game game) {
         resetDrawDeck(game, new HashSet<>());
     }
