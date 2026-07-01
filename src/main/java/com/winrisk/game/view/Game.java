@@ -51,6 +51,8 @@ public class Game implements FieldListener, Viewable, Saveable {
     private CombatResolver combatResolver;
     private WinConditionEvaluator winConditionEvaluator;
     private boolean maneuverUsed;
+    private Field maneuverSource;
+    private Field maneuverDestination;
     private boolean commanderDieUsed;
     private final Serializer serializer = new JavaSerializer();
 
@@ -203,6 +205,8 @@ public class Game implements FieldListener, Viewable, Saveable {
         if (curState == GamePhase.REINFORCE) {
             advanceToNextActivePlayer();
             maneuverUsed = false;
+            maneuverSource = null;
+            maneuverDestination = null;
             commanderDieUsed = false;
             Player player = getPlayer();
             player.setConqueredTerritoryThisTurn(false);
@@ -307,7 +311,12 @@ public class Game implements FieldListener, Viewable, Saveable {
                     && from.getPatch().contains(to)
                     && from.move(to, troops);
         }
-        if (maneuverUsed) {
+        // Official rules allow a single fortification move of any number of
+        // armies from one territory to one connected territory. Once a route
+        // has been used this turn, only further moves along that same route are
+        // permitted (so a UI can move armies one at a time), while starting a
+        // different fortification is blocked.
+        if (maneuverUsed && (from != maneuverSource || to != maneuverDestination)) {
             return false;
         }
         if (from.getPlayer() != getPlayer()) {
@@ -320,7 +329,11 @@ public class Game implements FieldListener, Viewable, Saveable {
             return false;
         }
         boolean moved = from.move(to, troops);
-        maneuverUsed = moved;
+        if (moved) {
+            maneuverUsed = true;
+            maneuverSource = from;
+            maneuverDestination = to;
+        }
         return moved;
     }
 
