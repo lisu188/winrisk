@@ -18,17 +18,6 @@ public class DataTests {
     }
 
     @Test
-    public void motionEventData() {
-        long t = System.currentTimeMillis();
-        MotionEvent e = new MotionEvent(MotionEvent.ACTION_DOWN, t, t+1, 2, 3);
-        assertEquals(MotionEvent.ACTION_DOWN, e.getAction());
-        assertEquals(t, e.getDownTime());
-        assertEquals(t+1, e.getEventTime());
-        assertEquals(2, e.getX());
-        assertEquals(3, e.getY());
-    }
-
-    @Test
     public void paramsRoundTrip() throws Exception {
         Params p = new Params();
         p.setAiPlayers(2);

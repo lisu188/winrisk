@@ -6,8 +6,6 @@ import com.winrisk.game.object.Continent;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.serialization.*;
 import com.winrisk.game.util.PointF;
-import com.winrisk.game.view.Game;
-import com.winrisk.game.view.GameSurface;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,19 +34,6 @@ public class Map implements Saveable {
     public void addField(PointF point) {
         fields.add(new Field(new PointF(point.x, point.y)));
         applyMetadata();
-    }
-
-    public void draw(GameSurface graphics, Game game) {
-        graphics.drawBackground(image);
-        for (Field field : fields) {
-            field.drawLines(graphics);
-        }
-
-        for (Field field : (game == null) || !game.getParams().isFogOfWar() ? fields
-                : game.getPlayers().get(0)
-                .getVis(game)) {
-            field.drawFields(graphics);
-        }
     }
 
     @Override

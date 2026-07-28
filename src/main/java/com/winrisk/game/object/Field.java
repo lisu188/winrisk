@@ -2,12 +2,9 @@ package com.winrisk.game.object;
 
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.rules.CardSymbol;
-import com.winrisk.game.util.Colors;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.view.Game;
-import com.winrisk.game.view.GameSurface;
 
-import java.awt.*;
 import java.io.Serializable;
 import java.util.stream.Collectors;
 
@@ -50,65 +47,6 @@ public class Field implements Serializable {
             }
         }
         return bor;
-    }
-
-    private static final int DISC_DIAMETER = 32;
-    private static final int RING_WIDTH = 6;
-    private static final Color INK = new Color(0x1B2631);
-    private static final Color CROSS_REGION_LINK = new Color(120, 110, 95, 90);
-    private static final int REGION_LINK_ALPHA = 150;
-
-    public void drawFields(GameSurface graphics) {
-        if (player == null) {
-            Color fill = continent == null ? Color.WHITE : continent.getColor();
-            drawDisc(graphics, fill);
-            if (continent != null) {
-                graphics.setColor(Colors.textColorFor(fill));
-                graphics.drawStringBold(Integer.toString(continent.getBonus()),
-                        point.x, point.y);
-            }
-            drawName(graphics);
-            return;
-        }
-        drawDisc(graphics, player.getColor());
-        graphics.setColor(Colors.textColorFor(player.getColor()));
-        graphics.drawStringBold(Integer.toString(army), point.x, point.y);
-        drawName(graphics);
-    }
-
-    private void drawDisc(GameSurface graphics, Color fill) {
-        graphics.setColor(INK);
-        graphics.drawOval(point.x, point.y,
-                DISC_DIAMETER + RING_WIDTH, DISC_DIAMETER + RING_WIDTH);
-        graphics.setColor(fill);
-        graphics.drawOval(point.x, point.y, DISC_DIAMETER, DISC_DIAMETER);
-    }
-
-    private void drawName(GameSurface graphics) {
-        graphics.setColor(INK);
-        graphics.drawStringSmall(getDisplayName(), point.x,
-                point.y + (DISC_DIAMETER / 2) + 12);
-    }
-
-    public void drawLines(GameSurface graphics) {
-        for (Field aNext : next) {
-            // Draw each link once (links are translucent, so drawing them from
-            // both endpoints would stack the alpha). Fields without assigned
-            // indices - hand-built fixtures - keep the draw-both behaviour.
-            if (fieldIndex >= 0 && aNext.getFieldIndex() >= 0
-                    && fieldIndex >= aNext.getFieldIndex()) {
-                continue;
-            }
-            Color color = CROSS_REGION_LINK;
-            if ((continent != null) && (this.continent == aNext.getContinent())) {
-                Color tint = continent.getColor();
-                color = new Color(tint.getRed(), tint.getGreen(), tint.getBlue(),
-                        REGION_LINK_ALPHA);
-            }
-            graphics.setColor(color);
-            graphics.drawLine(point.x, point.y, aNext.getPoint().x,
-                    aNext.getPoint().y);
-        }
     }
 
     public void fight(Field def, Game game) {

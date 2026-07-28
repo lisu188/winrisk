@@ -50,7 +50,7 @@ test {
 }
 
 application {
-    mainClass = 'com.winrisk.gui.StartGame'
+    mainClass = 'com.winrisk.game.HeadlessCli'
 }
 
 jar {

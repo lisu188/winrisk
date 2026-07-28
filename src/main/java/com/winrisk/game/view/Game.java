@@ -6,7 +6,6 @@ import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PlayerList;
 import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.GamePhase;
-import com.winrisk.game.data.MotionEvent;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.mission.Mission;
 import com.winrisk.game.mission.MissionDeck;
@@ -26,14 +25,12 @@ import com.winrisk.game.serialization.Saveable;
 import com.winrisk.game.serialization.Serializer;
 import com.winrisk.game.serialization.Sketch;
 import com.winrisk.game.util.Colors;
-import com.winrisk.game.util.PointF;
 
 import java.awt.Color;
 import java.util.List;
 import java.util.Random;
 
-public class Game implements FieldListener, Viewable, Saveable {
-    private final FieldDetector fieldDetector = new FieldDetector(this);
+public class Game implements Saveable {
     private int curPlayer;
     private GamePhase curState;
     private Map map = new Map();
@@ -89,11 +86,6 @@ public class Game implements FieldListener, Viewable, Saveable {
 
     public void setCurPlayer(int curPlayer) {
         this.curPlayer = curPlayer;
-    }
-
-    @Override
-    public FieldList getFieldList() {
-        return map.getFields();
     }
 
     public FieldList getFields() {
@@ -276,24 +268,8 @@ public class Game implements FieldListener, Viewable, Saveable {
         return !player.getPlayerInterface().isInteractive();
     }
 
-    @Override
     public void onAction() {
         while (next()) ;
-    }
-
-    @Override
-    public void onClose() {
-
-    }
-
-    @Override
-    public void onDraw(GameSurface graphics) {
-        map.draw(graphics, this);
-    }
-
-    @Override
-    public void onEvent(MotionEvent event) {
-        fieldDetector.feed(event);
     }
 
     public CombatResult attack(Field from, Field to) {
@@ -336,7 +312,6 @@ public class Game implements FieldListener, Viewable, Saveable {
         return moved;
     }
 
-    @Override
     public boolean onFieldDrag(Field from, Field to) {
         switch (getPhase()) {
             case REINFORCE:
@@ -363,7 +338,6 @@ public class Game implements FieldListener, Viewable, Saveable {
         return false;
     }
 
-    @Override
     public boolean onFromField(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -375,7 +349,6 @@ public class Game implements FieldListener, Viewable, Saveable {
         return true;
     }
 
-    @Override
     public boolean onLongClick(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -385,11 +358,6 @@ public class Game implements FieldListener, Viewable, Saveable {
         }
         field.rein(field.getPlayer().getCurrentReinforcements());
         return true;
-    }
-
-    @Override
-    public void onSave(String path) {
-        save(path);
     }
 
     public void save(String path) {
@@ -487,7 +455,6 @@ public class Game implements FieldListener, Viewable, Saveable {
                 : RiskCard.territory(map.getFields().get(cd.fieldIndex));
     }
 
-    @Override
     public boolean onShortClick(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -496,22 +463,6 @@ public class Game implements FieldListener, Viewable, Saveable {
             return false;
         }
         field.rein(1);
-        return true;
-    }
-
-    @Override
-    public boolean onToField(Field field) {
-        return false;
-
-    }
-
-    @Override
-    public boolean onVoidClick(PointF point) {
-        return false;
-    }
-
-    @Override
-    public boolean onVoidDrag(PointF from, PointF to) {
         return true;
     }
 
