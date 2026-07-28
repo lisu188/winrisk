@@ -6,3 +6,7 @@ target/
 out/
 build/
 .gradle/
+
+frontend/node_modules/
+frontend/dist/
+saves/
