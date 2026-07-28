@@ -15,7 +15,21 @@ public class JavaSerializer implements Serializer {
         requireSaveable(map);
         File input = requirePath(path);
         try (InputStream fileStream = new FileInputStream(input)) {
-            byte[] raw = readAll(fileStream);
+            load(map, fileStream, input.getAbsolutePath());
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Could not load serialized data from " + input.getAbsolutePath(), e);
+        }
+    }
+
+    @Override
+    public void load(Saveable map, InputStream input, String sourceName) {
+        requireSaveable(map);
+        if (input == null) {
+            throw new IllegalArgumentException("Input stream cannot be null: " + sourceName);
+        }
+        try {
+            byte[] raw = readAll(input);
             byte[] data = isGzip(raw) ? decompress(raw) : raw;
 
             Sketch sketch = tryJsonDeserialize(map, data);
@@ -25,12 +39,12 @@ public class JavaSerializer implements Serializer {
 
             if (sketch == null) {
                 throw new IllegalArgumentException(
-                        "Unsupported serialized data: " + input.getAbsolutePath());
+                        "Unsupported serialized data: " + sourceName);
             }
-            applySketch(map, sketch, input);
+            applySketch(map, sketch, sourceName);
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "Could not load serialized data from " + input.getAbsolutePath(), e);
+                    "Could not load serialized data from " + sourceName, e);
         }
     }
 
@@ -60,12 +74,12 @@ public class JavaSerializer implements Serializer {
         return new File(path);
     }
 
-    private void applySketch(Saveable saveable, Sketch sketch, File source) {
+    private void applySketch(Saveable saveable, Sketch sketch, String sourceName) {
         try {
             saveable.fromSketch(sketch);
         } catch (RuntimeException e) {
             throw new IllegalArgumentException(
-                    "Invalid serialized data: " + source.getAbsolutePath(), e);
+                    "Invalid serialized data: " + sourceName, e);
         }
     }
 

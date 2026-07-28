@@ -4,7 +4,6 @@ import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.map.BuiltinMaps;
 import com.winrisk.game.map.Map;
 
-import java.io.File;
 import java.io.Serializable;
 import java.util.Random;
 
@@ -75,13 +74,7 @@ public class Params implements Serializable {
             return BuiltinMaps.byName(builtinMap);
         }
         if (map == null) {
-            try {
-                map = new File(Map.class.getResource("world.map").toURI())
-                        .getAbsolutePath();
-            } catch (Exception e) {
-                throw new IllegalStateException(
-                        "No map configured and default map is unavailable", e);
-            }
+            return BuiltinMaps.byName(BuiltinMaps.WORLD);
         }
         return new Map(this.map);
     }

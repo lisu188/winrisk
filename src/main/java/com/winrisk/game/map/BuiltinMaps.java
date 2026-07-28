@@ -1,8 +1,7 @@
 package com.winrisk.game.map;
 
-import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -48,13 +47,16 @@ public final class BuiltinMaps {
     }
 
     private static Map world() {
-        try {
-            URL resource = Map.class.getResource("world.map");
-            if (resource == null) {
+        // Stream-based so the resource loads from inside a jar as well as from
+        // an exploded class directory.
+        try (InputStream input = Map.class.getResourceAsStream("world.map")) {
+            if (input == null) {
                 throw new IllegalStateException("Default world map resource is unavailable");
             }
-            return new Map(new File(resource.toURI()).getAbsolutePath());
-        } catch (URISyntaxException e) {
+            Map map = new Map();
+            map.load(input, "classpath:com/winrisk/game/map/world.map");
+            return map;
+        } catch (IOException e) {
             throw new IllegalStateException("Default world map resource is unavailable", e);
         }
     }

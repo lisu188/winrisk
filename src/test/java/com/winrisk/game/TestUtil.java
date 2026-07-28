@@ -22,6 +22,9 @@ public class TestUtil {
         params.setHumanPlayers(0);
         params.setAiPlayers(4);
         params.setGameMode(GameMode.SECRET_MISSION);
+        // Deterministic fixture: some unseeded AI matchups stalemate forever,
+        // which hangs tests that run games to completion (e.g. onAction()).
+        params.setRandomSeed(4242L);
 
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
 

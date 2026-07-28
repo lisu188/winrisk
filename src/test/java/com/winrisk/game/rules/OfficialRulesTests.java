@@ -3,13 +3,13 @@ package com.winrisk.game.rules;
 import com.winrisk.game.Play;
 import com.winrisk.game.ai.PlayerInterface;
 import com.winrisk.game.data.GameMode;
+import com.winrisk.game.HeadlessCli;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.mission.Mission;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
 import com.winrisk.game.view.Game;
-import com.winrisk.gui.StartGame;
 import org.junit.Test;
 
 import java.io.File;
@@ -261,7 +261,7 @@ public class OfficialRulesTests {
 
     @Test
     public void cliFlagsAndSeededHeadlessPlayAreDeterministic() throws Exception {
-        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play",
                 "--mode=capital",
                 "--seed=99",

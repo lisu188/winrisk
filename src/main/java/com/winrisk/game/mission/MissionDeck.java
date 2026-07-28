@@ -78,7 +78,7 @@ public class MissionDeck {
     }
 
     static Mission createEliminationMission(Player target, int targetIndex) {
-        String description = "Eliminate the player with color " + target.getColor();
+        String description = "Eliminate player " + (targetIndex + 1) + ".";
         return new Mission(description, (game, player) -> {
             // A player can never eliminate themselves, so the official fallback
             // objective for a self-targeting mission is to capture 24 territories.
