@@ -6,16 +6,18 @@ import com.winrisk.game.data.Params;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
 import com.winrisk.game.view.Game;
-import com.winrisk.game.view.GameSurface;
 import org.junit.Test;
 
 import javax.imageio.ImageIO;
 import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
@@ -50,7 +52,7 @@ public class UiSmokeScreenshotTests {
             }, () -> {
             });
 
-            BufferedImage image = render(menu, 200, 200);
+            BufferedImage image = render(menu, 380, 440);
 
             assertButtonLabels(menu, "HOST GAME", "NEW MAP", "LOAD MAP", "LOAD GAME");
             assertImageHasContent("start menu", image, 4);
@@ -65,7 +67,8 @@ public class UiSmokeScreenshotTests {
         String originalHeadless = forceHeadless();
         try {
             GamePanel panel = new GamePanel(createClassicGame());
-            BufferedImage image = render(panel, 800, 600);
+            // Compose board + HUD side panel exactly like the real window.
+            BufferedImage image = render(panel.buildWindowContent(), 1180, 720);
 
             assertImageHasContent("game board", image, 16);
             writePng(image, "game-board.png");
@@ -95,16 +98,23 @@ public class UiSmokeScreenshotTests {
     }
 
     @Test
-    public void hudUsesLeftAlignedTextInsideViewport() {
-        Game game = createClassicGame();
-        RecordingSurface surface = new RecordingSurface();
+    public void hudPanelAccompaniesBoardInWindowContent() {
+        String originalHeadless = forceHeadless();
+        try {
+            Game game = createClassicGame();
+            GamePanel panel = new GamePanel(game);
 
-        game.onDraw(surface);
+            JComponent content = (JComponent) panel.buildWindowContent();
 
-        assertTrue(surface.leftAlignedStrings.stream()
-                .anyMatch(text -> text.value.startsWith("Mode: classic")));
-        assertTrue(surface.leftAlignedStrings.stream()
-                .allMatch(text -> text.x >= 12));
+            assertButtonLabels(content, "End Phase");
+            List<String> labels = new ArrayList<>();
+            collectLabelTexts(content, labels);
+            assertTrue(labels.stream().anyMatch(text -> text.contains("Phase: ")));
+            assertTrue(labels.stream().anyMatch(text -> text.contains("Reinforcements: ")));
+            assertTrue(labels.stream().anyMatch(text -> text.contains("Mode: classic")));
+        } finally {
+            restoreHeadless(originalHeadless);
+        }
     }
 
     @Test
@@ -203,13 +213,14 @@ public class UiSmokeScreenshotTests {
     }
 
     private static void click(GamePanel panel, Field field, int button) {
-        pressAndRelease(panel, field.getPoint().x, field.getPoint().y,
-                field.getPoint().x, field.getPoint().y, button);
+        Point at = panel.boardToScreen(field.getPoint().x, field.getPoint().y);
+        pressAndRelease(panel, at.x, at.y, at.x, at.y, button);
     }
 
     private static void drag(GamePanel panel, Field from, Field to) {
-        pressAndRelease(panel, from.getPoint().x, from.getPoint().y,
-                to.getPoint().x, to.getPoint().y, MouseEvent.BUTTON1);
+        Point start = panel.boardToScreen(from.getPoint().x, from.getPoint().y);
+        Point end = panel.boardToScreen(to.getPoint().x, to.getPoint().y);
+        pressAndRelease(panel, start.x, start.y, end.x, end.y, MouseEvent.BUTTON1);
     }
 
     private static void pressAndRelease(GamePanel panel,
@@ -344,42 +355,14 @@ public class UiSmokeScreenshotTests {
         }
     }
 
-    private static class RecordingSurface implements GameSurface {
-        private final List<DrawnString> leftAlignedStrings = new ArrayList<>();
-
-        @Override
-        public void drawBackground(byte[] background) {
-        }
-
-        @Override
-        public void drawLine(int x, int y, int x2, int y2) {
-        }
-
-        @Override
-        public void drawOval(int x, int y, int i, int j) {
-        }
-
-        @Override
-        public void drawString(String string, int x, int y) {
-        }
-
-        @Override
-        public void drawStringLeft(String string, int x, int y) {
-            leftAlignedStrings.add(new DrawnString(string, x));
-        }
-
-        @Override
-        public void setColor(Color white) {
-        }
-    }
-
-    private static class DrawnString {
-        private final String value;
-        private final int x;
-
-        DrawnString(String value, int x) {
-            this.value = value;
-            this.x = x;
+    private static void collectLabelTexts(Container container, List<String> labels) {
+        for (Component child : container.getComponents()) {
+            if (child instanceof JLabel && ((JLabel) child).getText() != null) {
+                labels.add(((JLabel) child).getText());
+            }
+            if (child instanceof Container) {
+                collectLabelTexts((Container) child, labels);
+            }
         }
     }
 }

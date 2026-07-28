@@ -17,7 +17,7 @@ public class Continent implements Serializable {
     public Continent(int color, int bonus) {
         this.bonus = bonus;
         this.colorNo = color;
-        this.color = Colors.get(color);
+        this.color = Colors.getContinent(color);
         fields = new FieldList();
     }
 
