@@ -29,54 +29,35 @@ class HostGameWindow {
         if (GraphicsEnvironment.isHeadless()) {
             return;
         }
-        frame = new JFrame();
-        frame.setBounds(100, 100, 320, 320);
+        frame = new JFrame("Host Game");
+        frame.setSize(460, 560);
+        frame.setLocationRelativeTo(null);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.getContentPane().setLayout(new GridLayout(0, 1, 0, 0));
+
+        JPanel root = new JPanel();
+        root.setBackground(UiTheme.SLATE);
+        root.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+        root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
+        frame.setContentPane(root);
 
         final JComboBox<MapChoice> mapBox = new JComboBox<>();
-        frame.getContentPane().add(mapBox);
 
         final JComboBox<GameMode> modeBox = new JComboBox<>(GameMode.values());
         modeBox.setSelectedItem(GameMode.CLASSIC);
-        frame.getContentPane().add(modeBox);
 
         final JCheckBox skynetModeBox = new JCheckBox("Skynet Mode");
-        frame.getContentPane().add(skynetModeBox);
-
         final JCheckBox attackWithAllBox = new JCheckBox("Attack with All");
-        frame.getContentPane().add(attackWithAllBox);
-
         final JCheckBox fogOfWarCkeckBox = new JCheckBox("Fog of War");
-        frame.getContentPane().add(fogOfWarCkeckBox);
-
         final JCheckBox incrementalCardsBox = new JCheckBox("Incremental Card Values");
-        frame.getContentPane().add(incrementalCardsBox);
-
         final JCheckBox expandedManeuverBox = new JCheckBox("Expanded Maneuver");
-        frame.getContentPane().add(expandedManeuverBox);
-
         final JCheckBox attackCardRerollBox = new JCheckBox("Attack Card Reroll");
-        frame.getContentPane().add(attackCardRerollBox);
-
         final JCheckBox commanderDieBox = new JCheckBox("Commander Die");
-        frame.getContentPane().add(commanderDieBox);
 
         final JTextField seedField = new JTextField();
         seedField.setToolTipText("Random seed");
-        frame.getContentPane().add(seedField);
-
-        JPanel panel = new JPanel();
-        frame.getContentPane().add(panel);
-        panel.setLayout(new GridLayout(0, 2, 0, 0));
-
-        JPanel panel_1 = new JPanel();
-        frame.getContentPane().add(panel_1);
-        panel_1.setLayout(new GridLayout(0, 2, 0, 0));
 
         final JSpinner aiPlayers = new JSpinner();
         aiPlayers.setModel(new SpinnerNumberModel(2, 1, 4, 1));
-        panel_1.add(aiPlayers);
         aiPlayers.setToolTipText("AI Players");
         modeBox.addActionListener(event -> {
             GameMode mode = (GameMode) modeBox.getSelectedItem();
@@ -88,11 +69,13 @@ class HostGameWindow {
             }
         });
 
-        JLabel lblAiPlayers = new JLabel("AI Players");
-        lblAiPlayers.setHorizontalAlignment(SwingConstants.CENTER);
-        panel_1.add(lblAiPlayers);
-
         JButton startButton = new JButton("START");
+        startButton.setFont(UiTheme.HEADER_FONT);
+        startButton.setBackground(UiTheme.ACCENT);
+        startButton.setForeground(UiTheme.INK);
+        startButton.setFocusPainted(false);
+        startButton.setAlignmentX(Component.LEFT_ALIGNMENT);
+        startButton.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         startButton.addActionListener(arg0 -> {
             try {
                 Params params = new Params();
@@ -114,15 +97,70 @@ class HostGameWindow {
             } catch (Exception e) {
                 JOptionPane.showMessageDialog(HostGameWindow.this.frame,
                         "Chosen map file was not a correct map file: " + e,
-                        "Inalid file format.", JOptionPane.ERROR_MESSAGE);
+                        "Invalid file format.", JOptionPane.ERROR_MESSAGE);
             }
 
         });
-        frame.getContentPane().add(startButton);
+
+        root.add(labeledSection("Board", mapBox));
+        root.add(Box.createVerticalStrut(10));
+        root.add(labeledSection("Mode", modeBox));
+        root.add(Box.createVerticalStrut(10));
+        root.add(labeledSection("AI Players", aiPlayers));
+        root.add(Box.createVerticalStrut(10));
+        root.add(rulesSection(skynetModeBox, attackWithAllBox, fogOfWarCkeckBox,
+                incrementalCardsBox, expandedManeuverBox, attackCardRerollBox,
+                commanderDieBox));
+        root.add(Box.createVerticalStrut(10));
+        root.add(labeledSection("Random Seed (optional)", seedField));
+        root.add(Box.createVerticalGlue());
+        root.add(startButton);
 
         for (MapChoice choice : getAvailableMaps(new File("maps"))) {
             mapBox.addItem(choice);
         }
+    }
+
+    /**
+     * A labelled form row: a small header above the control. Static and
+     * headless-safe so layout can be verified in tests.
+     */
+    static JPanel labeledSection(String label, JComponent control) {
+        JPanel section = new JPanel(new BorderLayout(0, 4));
+        section.setOpaque(false);
+        JLabel header = new JLabel(label);
+        header.setFont(UiTheme.SMALL_FONT);
+        header.setForeground(UiTheme.TEXT_MUTED);
+        section.add(header, BorderLayout.NORTH);
+        section.add(control, BorderLayout.CENTER);
+        section.setAlignmentX(Component.LEFT_ALIGNMENT);
+        section.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        return section;
+    }
+
+    /**
+     * The optional-rules group: a two-column grid of checkboxes under a
+     * "Rules" header. Static and headless-safe for tests.
+     */
+    static JPanel rulesSection(JCheckBox... checkBoxes) {
+        JPanel grid = new JPanel(new GridLayout(0, 2, 10, 2));
+        grid.setOpaque(false);
+        for (JCheckBox checkBox : checkBoxes) {
+            checkBox.setOpaque(false);
+            checkBox.setFont(UiTheme.SMALL_FONT);
+            checkBox.setForeground(UiTheme.TEXT_LIGHT);
+            grid.add(checkBox);
+        }
+        JPanel section = new JPanel(new BorderLayout(0, 4));
+        section.setOpaque(false);
+        JLabel header = new JLabel("Rules");
+        header.setFont(UiTheme.SMALL_FONT);
+        header.setForeground(UiTheme.TEXT_MUTED);
+        section.add(header, BorderLayout.NORTH);
+        section.add(grid, BorderLayout.CENTER);
+        section.setAlignmentX(Component.LEFT_ALIGNMENT);
+        section.setMaximumSize(new Dimension(Integer.MAX_VALUE, 140));
+        return section;
     }
 
     static List<MapChoice> getAvailableMaps(File folder) {

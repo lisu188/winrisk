@@ -10,37 +10,39 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 public class GraphicsSurface implements GameSurface {
-    private BufferedImage cache = null;
-    private Graphics graphics;
-    private int x;
-    private int y;
+    private BufferedImage decodedBackground;
+    private Graphics2D graphics;
+    private BoardViewport viewport;
+    private int panelWidth;
+    private int panelHeight;
 
     @Override
     public void drawBackground(byte[] background) {
-        if (cache == null) {
+        if (decodedBackground == null) {
             if (background == null) {
                 return;
             }
-            ByteArrayInputStream bis = new ByteArrayInputStream(background);
             try {
-                cache = ImageIO.read(bis);
+                decodedBackground = ImageIO.read(new ByteArrayInputStream(background));
             } catch (IOException e) {
                 e.printStackTrace();
                 return;
             }
-            BufferedImage dimg = new BufferedImage(x, y, cache.getType());
-            Graphics2D g = dimg.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION,
-                    RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                    RenderingHints.VALUE_ANTIALIAS_ON);
-            g.drawImage(cache, 0, 0, x, y, 0, 0, cache.getWidth(),
-                    cache.getHeight(), null);
-            g.dispose();
-            cache = dimg;
         }
-        graphics.drawImage(cache, 0, 0, null);
-
+        if (decodedBackground == null) {
+            return;
+        }
+        // With a viewport the graphics is already in board space. The image is
+        // stretched into the fixed default board rectangle - not the per-map
+        // bounding box - so the art lands identically in the editor and the
+        // game regardless of where territories sit. Without a viewport
+        // (legacy callers) it fills the panel directly.
+        if (viewport != null) {
+            graphics.drawImage(decodedBackground, 0, 0,
+                    BoardViewport.DEFAULT_WIDTH, BoardViewport.DEFAULT_HEIGHT, null);
+        } else {
+            graphics.drawImage(decodedBackground, 0, 0, panelWidth, panelHeight, null);
+        }
     }
 
     @Override
@@ -68,13 +70,55 @@ public class GraphicsSurface implements GameSurface {
     }
 
     @Override
+    public void drawStringSmall(String string, int x, int y) {
+        withFont(graphics.getFont().deriveFont(10f), () -> drawString(string, x, y));
+    }
+
+    @Override
+    public void drawStringBold(String string, int x, int y) {
+        withFont(graphics.getFont().deriveFont(Font.BOLD, 13f),
+                () -> drawString(string, x, y));
+    }
+
+    private void withFont(Font font, Runnable draw) {
+        Font previous = graphics.getFont();
+        graphics.setFont(font);
+        try {
+            draw.run();
+        } finally {
+            graphics.setFont(previous);
+        }
+    }
+
+    @Override
     public void setColor(Color white) {
         graphics.setColor(white);
     }
 
     public void setGraphics(JPanel panel, Graphics graphics) {
-        this.graphics = graphics;
-        x = panel.getWidth();
-        y = panel.getHeight();
+        setGraphics(panel, graphics, null);
+    }
+
+    /**
+     * Prepares the surface for one paint pass. When a viewport is supplied the
+     * graphics is translated and uniformly scaled so that every draw call made
+     * in board coordinates lands letterboxed within the panel.
+     */
+    public void setGraphics(JPanel panel, Graphics graphics, BoardViewport viewport) {
+        this.graphics = (Graphics2D) graphics;
+        this.viewport = viewport;
+        this.panelWidth = panel.getWidth();
+        this.panelHeight = panel.getHeight();
+        this.graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
+        this.graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        this.graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        this.graphics.setStroke(new BasicStroke(2f));
+        if (viewport != null) {
+            this.graphics.translate(viewport.getOffsetX(), viewport.getOffsetY());
+            this.graphics.scale(viewport.getScale(), viewport.getScale());
+        }
     }
 }

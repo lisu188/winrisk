@@ -202,6 +202,27 @@ public class GuiTests {
         assertEquals(3, startGame.getFilePathCallCount);
     }
 
+    @Test
+    public void graphicsSurfaceAppliesViewportTransform() {
+        System.setProperty("java.awt.headless", "true");
+        BufferedImage img = new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        JPanel panel = new JPanel();
+        panel.setSize(200, 200);
+        BoardViewport viewport = new BoardViewport(0, 0, 100, 100);
+        viewport.setScreenSize(200, 200);
+        GraphicsSurface surface = new GraphicsSurface();
+        surface.setGraphics(panel, g, viewport);
+        surface.setColor(Color.RED);
+        surface.drawOval(50, 50, 10, 10);
+        surface.drawStringSmall("small", 20, 20);
+        surface.drawStringBold("bold", 20, 40);
+        g.dispose();
+        // The oval is centred on board (50,50); at scale 2 that is screen
+        // (100,100), so the viewport transform must have been applied.
+        assertEquals(Color.RED.getRGB(), img.getRGB(100, 100));
+    }
+
     @SuppressWarnings("unchecked")
     private <T> T allocateWithoutConstructor(Class<T> type) throws Exception {
         Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");

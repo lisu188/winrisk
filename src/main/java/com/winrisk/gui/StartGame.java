@@ -23,7 +23,8 @@ public class StartGame extends JFrame {
         setTitle("WinRisk");
         setResizable(false);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setBounds(100, 100, 200, 200);
+        setSize(380, 440);
+        setLocationRelativeTo(null);
         setContentPane(createMenuPanel(
                 () -> {
                     new HostGameWindow().setVisible(true);
@@ -39,27 +40,46 @@ public class StartGame extends JFrame {
                                   Runnable loadMapAction,
                                   Runnable loadGameAction) {
         JPanel contentPane = new JPanel();
-        contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
-        contentPane.setLayout(new GridLayout(0, 1, 0, 0));
+        contentPane.setBackground(UiTheme.SLATE);
+        contentPane.setBorder(new EmptyBorder(30, 36, 30, 36));
+        contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
 
-        JButton buttonHostGame = new JButton("HOST GAME");
-        JButton btnNewMap = new JButton("NEW MAP");
-        JButton button = new JButton("LOAD MAP");
-        JButton btnLoadGame = new JButton("LOAD GAME");
+        JLabel title = new JLabel("WinRisk");
+        title.setFont(UiTheme.TITLE_FONT);
+        title.setForeground(UiTheme.PARCHMENT);
+        title.setAlignmentX(CENTER_ALIGNMENT);
 
-        buttonHostGame.addActionListener(arg0 -> EventQueue.invokeLater(hostGameAction));
+        JLabel subtitle = new JLabel("World domination, one turn at a time");
+        subtitle.setFont(UiTheme.SMALL_FONT);
+        subtitle.setForeground(UiTheme.TEXT_MUTED);
+        subtitle.setAlignmentX(CENTER_ALIGNMENT);
 
-        btnNewMap.addActionListener(arg0 -> EventQueue.invokeLater(newMapAction));
-
-        button.addActionListener(arg0 -> EventQueue.invokeLater(loadMapAction));
-
-        btnLoadGame.addActionListener(arg0 -> EventQueue.invokeLater(loadGameAction));
-
-        contentPane.add(buttonHostGame);
-        contentPane.add(btnNewMap);
-        contentPane.add(button);
-        contentPane.add(btnLoadGame);
+        contentPane.add(title);
+        contentPane.add(Box.createVerticalStrut(4));
+        contentPane.add(subtitle);
+        contentPane.add(Box.createVerticalStrut(28));
+        // The buttons stay direct children of the content pane.
+        contentPane.add(menuButton("HOST GAME", hostGameAction));
+        contentPane.add(Box.createVerticalStrut(10));
+        contentPane.add(menuButton("NEW MAP", newMapAction));
+        contentPane.add(Box.createVerticalStrut(10));
+        contentPane.add(menuButton("LOAD MAP", loadMapAction));
+        contentPane.add(Box.createVerticalStrut(10));
+        contentPane.add(menuButton("LOAD GAME", loadGameAction));
+        contentPane.add(Box.createVerticalGlue());
         return contentPane;
+    }
+
+    private static JButton menuButton(String label, Runnable action) {
+        JButton button = new JButton(label);
+        button.setFont(UiTheme.HEADER_FONT);
+        button.setBackground(UiTheme.SLATE_LIGHT);
+        button.setForeground(UiTheme.TEXT_LIGHT);
+        button.setFocusPainted(false);
+        button.setAlignmentX(CENTER_ALIGNMENT);
+        button.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        button.addActionListener(arg0 -> EventQueue.invokeLater(action));
+        return button;
     }
 
     public static void main(String[] args) {

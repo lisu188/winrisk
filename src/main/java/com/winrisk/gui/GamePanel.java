@@ -15,6 +15,13 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 
+/**
+ * The board canvas. Draws the current {@link Viewable} through a
+ * {@link BoardViewport} so the board scales uniformly to whatever size the
+ * (now resizable) window has, and maps mouse input back through the same
+ * transform. Window composition (canvas + HUD side panel) happens in
+ * {@link #buildWindowContent()}.
+ */
 public class GamePanel extends JPanel {
 
     private static final long serialVersionUID = -8440337679365334157L;
@@ -22,20 +29,61 @@ public class GamePanel extends JPanel {
     private final GraphicsSurface surface = new GraphicsSurface();
 
     private final Viewable viewable;
+    private final BoardViewport viewport;
+    private HudPanel hud;
+    private long pressWhen;
 
     public GamePanel(Viewable viewable) {
         setMouseListener();
         setAncestorListener();
         this.viewable = viewable;
+        this.viewport = viewable instanceof Game
+                ? BoardViewport.forFields(((Game) viewable).getFields())
+                : BoardViewport.defaultBoard();
+        setBackground(UiTheme.SLATE);
         if (!Boolean.getBoolean("java.awt.headless")
                 && !GraphicsEnvironment.isHeadless()) {
             installHumanChoiceProviders(viewable);
-            JFrame frame = new JFrame();
-            frame.setSize(800, 600);
-            frame.getContentPane().add(this);
-            frame.setResizable(false);
+            JFrame frame = new JFrame("WinRisk");
+            frame.setSize(1100, 720);
+            frame.setMinimumSize(new Dimension(900, 620));
+            frame.getContentPane().add(buildWindowContent());
+            frame.setResizable(true);
+            frame.setLocationRelativeTo(null);
             frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
             frame.setVisible(true);
+        }
+    }
+
+    /**
+     * Composes the full window content: this canvas in the centre with the
+     * HUD side panel on the right.
+     */
+    JComponent buildWindowContent() {
+        JPanel content = new JPanel(new BorderLayout());
+        hud = new HudPanel(viewable, this::stateChanged);
+        content.add(this, BorderLayout.CENTER);
+        content.add(hud, BorderLayout.EAST);
+        return content;
+    }
+
+    BoardViewport getViewport() {
+        return viewport;
+    }
+
+    /**
+     * Maps board coordinates to current screen pixels; used by tests to aim
+     * synthetic mouse events.
+     */
+    Point boardToScreen(int boardX, int boardY) {
+        viewport.setScreenSize(getWidth(), getHeight());
+        return new Point(viewport.boardToScreenX(boardX), viewport.boardToScreenY(boardY));
+    }
+
+    private void stateChanged() {
+        repaint();
+        if (hud != null) {
+            hud.refresh();
         }
     }
 
@@ -53,9 +101,21 @@ public class GamePanel extends JPanel {
 
     @Override
     protected void paintComponent(Graphics g) {
-        g.clearRect(0, 0, getWidth(), getHeight());
-        surface.setGraphics(this, g);
+        g.setColor(UiTheme.SLATE);
+        g.fillRect(0, 0, getWidth(), getHeight());
+        viewport.setScreenSize(getWidth(), getHeight());
+        paintBoardBackdrop(g);
+        surface.setGraphics(this, g, viewport);
         viewable.onDraw(surface);
+    }
+
+    private void paintBoardBackdrop(Graphics g) {
+        int x0 = viewport.boardToScreenX(viewport.getBoardX());
+        int y0 = viewport.boardToScreenY(viewport.getBoardY());
+        int x1 = viewport.boardToScreenX(viewport.getBoardX() + viewport.getBoardWidth());
+        int y1 = viewport.boardToScreenY(viewport.getBoardY() + viewport.getBoardHeight());
+        g.setColor(UiTheme.PARCHMENT);
+        g.fillRect(x0, y0, x1 - x0, y1 - y0);
     }
 
     private void setAncestorListener() {
@@ -87,12 +147,13 @@ public class GamePanel extends JPanel {
                     if (e.getButton() == MouseEvent.BUTTON3) {
                         viewable.onAction();
                     } else {
+                        pressWhen = e.getWhen();
                         viewable.onEvent(new MotionEvent(
                                 MotionEvent.ACTION_DOWN, e.getWhen(), e.getWhen(),
-                                e.getX(), e.getY()));
+                                toBoardX(e), toBoardY(e)));
                     }
                 } finally {
-                    e.getComponent().repaint();
+                    stateChanged();
                 }
             }
 
@@ -102,15 +163,24 @@ public class GamePanel extends JPanel {
                     if (e.getButton() != MouseEvent.BUTTON1) {
                         return;
                     }
+                    // Preserve the press timestamp so hold-to-act gestures
+                    // (reinforce all, delete territory) can be detected.
                     MotionEvent event = new MotionEvent(MotionEvent.ACTION_UP,
-                            e.getWhen(), e.getWhen(), e.getX(), e.getY());
+                            pressWhen, e.getWhen(), toBoardX(e), toBoardY(e));
                     viewable.onEvent(event);
-                    e.getComponent().repaint();
                 } finally {
-                    e.getComponent().repaint();
+                    stateChanged();
                 }
             }
         });
+    }
+
+    private int toBoardX(MouseEvent e) {
+        return viewport.screenToBoardX(e.getX());
+    }
+
+    private int toBoardY(MouseEvent e) {
+        return viewport.screenToBoardY(e.getY());
     }
 
     private void setWindowListener() {

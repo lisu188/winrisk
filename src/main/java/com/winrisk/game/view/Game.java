@@ -235,10 +235,10 @@ public class Game implements FieldListener, Viewable, Saveable {
             } else {
                 ifc = params.getAiFactory().getAi(i);
             }
-            players.add(new Player(Colors.get(i), ifc));
+            players.add(new Player(Colors.getPlayer(i), ifc));
         }
         if (params.getGameMode() == GameMode.CLASSIC && playerCount == 2) {
-            neutralPlayer = new Player(Color.GRAY, new com.winrisk.game.ai.PlayerAI());
+            neutralPlayer = new Player(Colors.NEUTRAL, new com.winrisk.game.ai.PlayerAI());
             neutralPlayer.setNeutral(true);
             players.add(neutralPlayer);
         }
@@ -289,7 +289,6 @@ public class Game implements FieldListener, Viewable, Saveable {
     @Override
     public void onDraw(GameSurface graphics) {
         map.draw(graphics, this);
-        drawHud(graphics);
     }
 
     @Override
@@ -335,29 +334,6 @@ public class Game implements FieldListener, Viewable, Saveable {
             maneuverDestination = to;
         }
         return moved;
-    }
-
-    private void drawHud(GameSurface graphics) {
-        if (players == null || players.isEmpty() || curPlayer < 0) {
-            return;
-        }
-        Player player = getPlayer();
-        graphics.setColor(Color.BLACK);
-        int x = 12;
-        int y = 18;
-        graphics.drawStringLeft("Mode: " + params.getGameMode().toCliValue()
-                + " | Phase: " + curState
-                + " | Player: " + (curPlayer + 1)
-                + (player.isNeutral() ? " neutral" : ""), x, y);
-        y += 16;
-        graphics.drawStringLeft("Reinforcements: " + player.getCurrentReinforcements()
-                + " | Cards: " + player.getRiskCards().size(), x, y);
-        y += 16;
-        if (params.getGameMode() == GameMode.SECRET_MISSION && player.getMission() != null) {
-            graphics.drawStringLeft("Mission: " + player.getMission().getDescription(), x, y);
-        } else if (params.getGameMode() == GameMode.CAPITAL && player.getHeadquarters() != null) {
-            graphics.drawStringLeft("Headquarters: " + player.getHeadquarters().getDisplayName(), x, y);
-        }
     }
 
     @Override
