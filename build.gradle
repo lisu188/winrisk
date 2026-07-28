@@ -1,7 +1,9 @@
 plugins {
     id 'java'
     id 'jacoco'
-    id 'application'
+    id 'org.springframework.boot' version '3.5.3'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.github.node-gradle.node' version '7.1.0'
 }
 
 group = 'WinRisk'
@@ -15,8 +17,12 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.code.gson:gson:2.10.1'
-    testImplementation 'junit:junit:4.12'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'com.google.code.gson:gson'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'junit:junit:4.13.2'
+    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine'
 }
 
 jacoco {
@@ -43,22 +49,41 @@ jacocoTestCoverageVerification {
     }
 }
 
-// ensure tests use junit 4
 test {
-    useJUnit()
+    useJUnitPlatform()
     finalizedBy jacocoTestReport, jacocoTestCoverageVerification
 }
 
-application {
-    mainClass = 'com.winrisk.game.HeadlessCli'
+springBoot {
+    mainClass = 'com.winrisk.web.WinRiskApplication'
 }
 
-jar {
-    manifest {
-        attributes 'Main-Class': application.mainClass
+// --- Frontend build (React SPA under frontend/) ---
+// Attached to bootJar only, so `./gradlew test` and the coverage gate never
+// need Node. Skip entirely with -PskipFrontend.
+node {
+    download = false
+    nodeProjectDir = file('frontend')
+}
+
+tasks.named('npmInstall') {
+    npmCommand = ['ci']
+}
+
+tasks.register('npmBuild', com.github.gradle.node.npm.task.NpmTask) {
+    dependsOn 'npmInstall'
+    args = ['run', 'build']
+    inputs.dir('frontend/src')
+    inputs.files('frontend/package.json', 'frontend/package-lock.json',
+            'frontend/vite.config.ts', 'frontend/index.html', 'frontend/tsconfig.json')
+    outputs.dir('frontend/dist')
+}
+
+bootJar {
+    if (!project.hasProperty('skipFrontend')) {
+        dependsOn 'npmBuild'
+        from('frontend/dist') {
+            into 'BOOT-INF/classes/static'
+        }
     }
-}
-
-tasks.named('distZip') {
-    enabled = true
 }
