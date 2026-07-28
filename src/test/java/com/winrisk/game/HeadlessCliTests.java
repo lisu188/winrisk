@@ -1,4 +1,4 @@
-package com.winrisk.gui;
+package com.winrisk.game;
 
 import com.winrisk.game.data.Params;
 import org.junit.Test;
@@ -8,11 +8,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 
-public class StartGameLaunchTests {
+public class HeadlessCliTests {
 
     @Test
     public void buildHeadlessConfigParsesFlagsAndDefaults() {
-        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play",
                 "--fog-of-war",
                 "--skynet",
@@ -46,12 +46,12 @@ public class StartGameLaunchTests {
 
     @Test
     public void buildHeadlessConfigResolvesBuiltinMapNames() {
-        StartGame.HeadlessConfig builtin = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig builtin = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play", "--map=Gondwana"});
         assertEquals("Gondwana", builtin.getParams().getBuiltinMap());
         assertEquals(26, builtin.getParams().loadMap().getFields().size());
 
-        StartGame.HeadlessConfig file = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig file = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play", "--map=maps/custom.map"});
         assertNull(file.getParams().getBuiltinMap());
     }
@@ -68,7 +68,7 @@ public class StartGameLaunchTests {
         AtomicBoolean uiLaunched = new AtomicBoolean(false);
         AtomicBoolean headlessLaunched = new AtomicBoolean(false);
 
-        StartGame.launch(new String[]{"--fog-of-war"},
+        HeadlessCli.launch(new String[]{"--fog-of-war"},
                 () -> uiLaunched.set(true),
                 config -> headlessLaunched.set(true));
 
@@ -79,9 +79,9 @@ public class StartGameLaunchTests {
     @Test
     public void launchWithHeadlessFlagRunsHeadlessBranchOnlyWithDeterministicDefaults() {
         AtomicBoolean uiLaunched = new AtomicBoolean(false);
-        AtomicReference<StartGame.HeadlessConfig> captured = new AtomicReference<>();
+        AtomicReference<HeadlessCli.HeadlessConfig> captured = new AtomicReference<>();
 
-        StartGame.launch(new String[]{"--headless-play"},
+        HeadlessCli.launch(new String[]{"--headless-play"},
                 () -> uiLaunched.set(true),
                 captured::set);
 
@@ -94,7 +94,7 @@ public class StartGameLaunchTests {
 
     private void assertInvalidConfig(String arg) {
         try {
-            StartGame.buildHeadlessConfig(new String[]{arg});
+            HeadlessCli.buildHeadlessConfig(new String[]{arg});
             fail("Expected invalid headless config for " + arg);
         } catch (IllegalArgumentException expected) {
             // expected

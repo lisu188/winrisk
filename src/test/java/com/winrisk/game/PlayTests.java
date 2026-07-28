@@ -8,7 +8,6 @@ import com.winrisk.game.data.GamePhase;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Player;
-import com.winrisk.gui.StartGame;
 import org.junit.Test;
 
 import java.io.File;
@@ -118,7 +117,7 @@ public class PlayTests {
 
     @Test
     public void headlessArgumentParsingEnablesToggles() {
-        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play",
                 "--fog-of-war",
                 "--skynet",
@@ -139,7 +138,7 @@ public class PlayTests {
 
     @Test
     public void headlessArgumentParsingHandlesNullArgsWithDefaults() {
-        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(null);
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(null);
 
         Params params = config.getParams();
         assertFalse(config.isHeadlessPlay());

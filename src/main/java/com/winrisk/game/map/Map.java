@@ -84,6 +84,14 @@ public class Map implements Saveable {
         applyMetadata();
     }
 
+    /**
+     * Loads a map from a stream, e.g. a classpath resource inside a jar.
+     */
+    public void load(java.io.InputStream input, String sourceName) {
+        serializer.load(this, input, sourceName);
+        applyMetadata();
+    }
+
     public void save(String path) {
         serializer.save(this, path);
     }
