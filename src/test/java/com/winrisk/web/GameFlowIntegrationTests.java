@@ -78,8 +78,10 @@ class GameFlowIntegrationTests {
         }
 
         // First drain the human's own end-phase echoes until an AI player
-        // holds control; then the stepper's frames stream in with strictly
-        // increasing versions until control genuinely returns to the human.
+        // holds control; then the stepper's frames stream in until control
+        // genuinely returns to the human. Broadcasts are sent outside the
+        // session lock, so frames may arrive reordered - apply the same
+        // drop-stale-versions merge rule the real client uses.
         long lastVersion = -1;
         boolean aiSeen = false;
         boolean humanAgain = false;
@@ -90,9 +92,9 @@ class GameFlowIntegrationTests {
             if (frame == null) {
                 break;
             }
-            assertTrue(frame.version > lastVersion,
-                    "frame versions must increase (got " + frame.version
-                            + " after " + lastVersion + ")");
+            if (frame.version <= lastVersion) {
+                continue;
+            }
             lastVersion = frame.version;
             if (frame.winnerIndex >= 0) {
                 humanAgain = true;

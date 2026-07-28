@@ -16,6 +16,12 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Cache Gradle files
         uses: actions/cache@v3
         with:
@@ -25,9 +31,19 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties') }}
           restore-keys: ${{ runner.os }}-gradle
       - name: Build with Gradle
-        run: ./gradlew build distZip
-      - name: Upload distribution
+        run: ./gradlew build
+      - name: Boot smoke test
+        run: |
+          java -jar build/libs/WinRisk-*-SNAPSHOT.jar --server.port=8080 & echo $! > boot.pid
+          for i in $(seq 1 30); do curl -sf localhost:8080/api/maps && break; sleep 1; done
+          ID=$(curl -sf -X POST localhost:8080/api/games -H 'Content-Type: application/json' \
+               -d '{"mode":"classic","aiPlayers":3,"map":{"builtin":"world"},"seed":42}' | jq -r .id)
+          curl -sf localhost:8080/api/games/$ID | jq -e '.fields | length == 42'
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/games/$ID/background)" = "200"
+          curl -sf localhost:8080/ | grep -q '<div id="root">'
+          kill $(cat boot.pid)
+      - name: Upload boot jar
         uses: actions/upload-artifact@v4
         with:
-          name: WinRisk-distribution
-          path: build/distributions/*.zip
+          name: WinRisk-bootjar
+          path: build/libs/*-SNAPSHOT.jar
