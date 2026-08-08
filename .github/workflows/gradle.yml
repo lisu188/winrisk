@@ -23,8 +23,21 @@ jobs:
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
 
-      - name: Build and test
-        run: ./gradlew :core:test :lwjgl3:classes :android:assembleDebug --stacktrace
+      - name: Test engine
+        id: engine_tests
+        continue-on-error: true
+        run: ./gradlew :core:test --stacktrace
+
+      - name: Print failing test reports
+        if: steps.engine_tests.outcome == 'failure'
+        run: find core/build/test-results/test -name '*.xml' -type f -print -exec cat {} \;
+
+      - name: Fail on engine test errors
+        if: steps.engine_tests.outcome == 'failure'
+        run: exit 1
+
+      - name: Build desktop and Android
+        run: ./gradlew :lwjgl3:classes :android:assembleDebug --stacktrace
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
