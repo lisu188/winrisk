@@ -2,15 +2,15 @@ package com.winrisk.game.object;
 
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.util.Colors;
+import com.winrisk.game.util.GameColor;
 
-import java.awt.*;
 import java.io.Serializable;
 
 public class Continent implements Serializable {
 
     private static final long serialVersionUID = -755509907464278869L;
     private final int colorNo;
-    private final Color color;
+    private final GameColor color;
     private final FieldList fields;
     private int bonus;
 
@@ -27,7 +27,6 @@ public class Continent implements Serializable {
         }
         fields.add(field);
         field.setContinent(this);
-
     }
 
     public void decBonus() {
@@ -39,9 +38,6 @@ public class Continent implements Serializable {
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
-            return false;
-        }
         if (!(obj instanceof Continent)) {
             return false;
         }
@@ -49,11 +45,7 @@ public class Continent implements Serializable {
         if (bonus != other.bonus) {
             return false;
         }
-        if (color == null) {
-            if (other.color != null) {
-                return false;
-            }
-        } else if (!color.equals(other.color)) {
+        if (color == null ? other.color != null : !color.equals(other.color)) {
             return false;
         }
         return fields.equals(other.fields);
@@ -84,7 +76,7 @@ public class Continent implements Serializable {
         return borders;
     }
 
-    public Color getColor() {
+    public GameColor getColor() {
         return color;
     }
 
@@ -108,16 +100,15 @@ public class Continent implements Serializable {
                 count++;
             }
         }
-        return count / this.fields.size();
+        return count / fields.size();
     }
 
     @Override
     public int hashCode() {
-        final int prime = 31;
         int result = 1;
-        result = (prime * result) + bonus;
-        result = (prime * result) + ((color == null) ? 0 : color.hashCode());
-        result = (prime * result) + (fields.hashCode());
+        result = (31 * result) + bonus;
+        result = (31 * result) + (color == null ? 0 : color.hashCode());
+        result = (31 * result) + fields.hashCode();
         return result;
     }
 
