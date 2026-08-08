@@ -9,8 +9,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 6.11 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
-qt_standard_project_setup(REQUIRES 6.11)
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+qt_standard_project_setup(REQUIRES 6.10)
 
 add_library(winrisk_engine STATIC
     src/engine/GameEngine.cpp
