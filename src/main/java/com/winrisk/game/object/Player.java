@@ -7,9 +7,9 @@ import com.winrisk.game.cluster.PatchList;
 import com.winrisk.game.mission.Mission;
 import com.winrisk.game.rules.CardSymbol;
 import com.winrisk.game.rules.RiskCard;
+import com.winrisk.game.util.GameColor;
 import com.winrisk.game.view.Game;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -19,16 +19,16 @@ public class Player {
 
     private final PlayerInterface playerInterface;
     private final List<RiskCard> riskCards = new ArrayList<>();
-    private Color color;
+    private GameColor color;
     private boolean conqueredTerritoryThisTurn;
     private int rein;
     private Mission mission;
     private boolean neutral;
     private Field headquarters;
 
-    public Player(Color color2, PlayerInterface ifc) {
+    public Player(GameColor color, PlayerInterface ifc) {
         this.playerInterface = ifc;
-        this.color = color2;
+        this.color = color;
         conqueredTerritoryThisTurn = false;
         rein = 0;
     }
@@ -62,7 +62,7 @@ public class Player {
     }
 
     public void applyTerritoryBonus(FieldList fields, Game game) {
-        fields.forEach(com.winrisk.game.object.Field::setMin);
+        fields.forEach(Field::setMin);
         rein(getTerritoryBonus(game));
     }
 
@@ -71,29 +71,16 @@ public class Player {
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
-            return false;
-        }
         if (!(obj instanceof Player)) {
             return false;
         }
         Player other = (Player) obj;
-        if (color == null) {
-            if (other.color != null) {
-                return false;
-            }
-        } else if (!color.equals(other.color)) {
-            return false;
-        }
-        return true;
+        return color == null ? other.color == null : color.equals(other.color);
     }
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = (prime * result) + ((color == null) ? 0 : color.hashCode());
-        return result;
+        return 31 + (color == null ? 0 : color.hashCode());
     }
 
     public FieldList getBorders(Game game) {
@@ -120,7 +107,7 @@ public class Player {
         return riskCards;
     }
 
-    public Color getColor() {
+    public GameColor getColor() {
         return color;
     }
 
@@ -136,7 +123,9 @@ public class Player {
     }
 
     public FieldList getFields(Game game) {
-        return game.getFields().stream().filter(field -> Player.this.equals(field.getPlayer())).collect(Collectors.toCollection(FieldList::new));
+        return game.getFields().stream()
+                .filter(field -> Player.this.equals(field.getPlayer()))
+                .collect(Collectors.toCollection(FieldList::new));
     }
 
     public int getFieldState(Game game) {
@@ -165,8 +154,7 @@ public class Player {
             if (!vis.contains(x)) {
                 vis.add(x);
             }
-            x.getNext().stream().filter(y -> !vis.contains(y))
-                    .forEach(vis::add);
+            x.getNext().stream().filter(y -> !vis.contains(y)).forEach(vis::add);
         }
         return vis;
     }
@@ -177,9 +165,7 @@ public class Player {
 
     public PatchList getPatchList(Game game) {
         PatchList pl = new PatchList();
-        Field field;
-        for (Field field1 : getFields(game)) {
-            field = field1;
+        for (Field field : getFields(game)) {
             if (!pl.has(field)) {
                 pl.add(field.getPatch());
             }
@@ -200,7 +186,7 @@ public class Player {
         if (!player.isDead(game)) {
             throw new RuntimeException("Not dead player.");
         }
-        this.riskCards.addAll(player.getRiskCards());
+        riskCards.addAll(player.getRiskCards());
         player.getRiskCards().clear();
         game.getCardService().tradeAfterElimination(game, this);
         conqueredTerritoryThisTurn = tmp;
