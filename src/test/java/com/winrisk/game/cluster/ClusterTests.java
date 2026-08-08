@@ -4,10 +4,9 @@ import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.object.Continent;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
+import com.winrisk.game.util.GameColor;
 import com.winrisk.game.util.PointF;
 import org.junit.Test;
-
-import java.awt.Color;
 
 import static org.junit.Assert.*;
 
@@ -25,8 +24,8 @@ public class ClusterTests {
         list.add(a);
         list.add(b);
 
-        Player human = new Player(Color.RED, PlayerFactory.getHuman());
-        Player ai = new Player(Color.BLUE, PlayerFactory.getRandomAI());
+        Player human = new Player(GameColor.RED, PlayerFactory.getHuman());
+        Player ai = new Player(GameColor.BLUE, PlayerFactory.getRandomAI());
         a.setPlayer(human);
         b.setPlayer(ai);
 
