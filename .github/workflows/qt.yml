@@ -30,18 +30,24 @@ on:
 
 jobs:
   desktop:
-    name: Desktop ${{ matrix.os }}
+    name: Desktop ${{ matrix.os }} / Qt ${{ matrix.qt }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-15]
+        include:
+          - os: ubuntu-24.04
+            qt: '6.11.1'
+          - os: windows-2025
+            qt: '6.11.0'
+          - os: macos-15
+            qt: '6.11.1'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: jurplel/install-qt-action@v4
         with:
-          version: '6.11.1'
+          version: ${{ matrix.qt }}
           cache: true
 
       - name: Configure
@@ -78,8 +84,6 @@ jobs:
           cache: true
 
       - name: Configure Android
-        env:
-          ANDROID_NDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}/ndk/27.2.12479018
         run: >-
           qt-cmake -S . -B build/android -GNinja
           -DCMAKE_BUILD_TYPE=Release
@@ -87,7 +91,7 @@ jobs:
           -DANDROID_ABI=arm64-v8a
           -DANDROID_PLATFORM=android-28
           -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
-          -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+          -DANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
 
       - name: Build APK
         run: cmake --build build/android --target apk --parallel
