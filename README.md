@@ -1,89 +1,93 @@
 # WinRisk
 
-WinRisk is a web implementation of the classic world domination board game:
-a **Spring Boot** server wrapping a pure-Java game engine, with a **React**
-single-page client rendered on canvas. Play solo against 1–4 AI opponents;
-the server hosts many concurrent games.
+WinRisk is being migrated to a single-process **C++20 + Qt 6.11 Qt Quick** application. The native client contains the game engine directly: there is no Spring Boot server, REST API, WebSocket transport, React frontend, browser, or WebView in the new runtime.
 
-## Prerequisites
-- Java 17 or newer
-- Node.js 22 or newer (only for building/serving the web client)
+## Current Qt milestone
 
-## Build and run
+The `qt-cpp` implementation already contains:
 
-```bash
-./gradlew build                 # engine + web tests, coverage gate, boot jar with the SPA
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
-```
+- pure C++20 engine with no Qt dependency
+- standard 42-territory world topology and continent bonuses
+- deterministic xoshiro-family RNG with serialized state
+- 2–5 player setup
+- human and AI players
+- reinforcement phase
+- Risk dice combat, captures and elimination
+- connected-territory maneuver phase
+- asynchronous one-action-at-a-time AI turns
+- Qt `QAbstractListModel` presentation layer
+- responsive Qt Quick desktop/tablet/phone UI
+- native quick-save/load using versioned JSON
+- import of current Java JSON saves for standard-map Classic games without neutral armies
+- CTest engine tests
+- Android-compatible Qt CMake target
 
-Open http://localhost:8080 — create a game in the lobby and play. Add
-`--server.port=<port>` to change the port, or `-PskipFrontend` to the build to
-produce a jar without the web client.
+The legacy Java/Spring/React source is intentionally still present on this migration branch as a behavior and format reference. It is not linked into the C++ application and will be removed only after parity work is complete.
 
-For frontend development run the API and the Vite dev server side by side:
+## Requirements
 
-```bash
-./gradlew bootRun               # API on :8080
-cd frontend && npm install && npm run dev    # UI on :5173, proxied to :8080
-```
+- CMake 3.24+
+- C++20 compiler
+- Qt 6.11.x with Core, Gui, Qml, Quick and QuickControls2
+- Ninja recommended
 
-## Playing
-- **REINFORCE**: click your territory to place one troop ("place all" toggle
-  places everything); trade card sets from the panel when you hold three or
-  more (forced at five).
-- **ATTACK**: click your territory, then an adjacent enemy; dice results pop up
-  as toasts and conquests resolve automatically.
-- **MOVE**: click a source, then a connected territory, choose the troop count.
-- End Phase hands over; AI turns animate live over a WebSocket.
+Qt 6.11 supports Windows, macOS, Linux, Android, iOS and WebAssembly. Android builds should use the NDK version supported by the installed Qt package.
 
-Game modes: World Domination (classic), Secret Mission, Capital. Optional
-rules: attack-with-all, fog of war, skynet, incremental card values, expanded
-maneuver, attack card reroll, commander die.
-
-## Maps
-Built-in boards: the classic 42-territory **World** map plus four historical
-supercontinents — **Pangaea**, **Laurasia**, **Gondwana**, **Rodinia** — and
-procedurally generated random maps. Custom `.map` files placed in a `maps/`
-directory next to the server appear in the lobby's map list.
-
-## Saving
-Games can be saved from the HUD and resumed from the lobby. Saves are JSON
-files in a `saves/` directory next to the server; the format is unchanged from
-earlier releases, so old saves still load.
-
-## Headless simulation
-The same jar runs AI-only simulations without starting the server:
+## Desktop build
 
 ```bash
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar --headless-play \
-    --map=pangaea --ai-players=4 --seed=42 --mode=classic
+cmake --preset default
+cmake --build --preset default
+ctest --preset default
 ```
 
-Flags: `--map=<builtin or path>`, `--mode=<classic|secret|capital>`,
-`--ai-players=<1..5>`, `--seed=<long>`, `--max-turns=<n>`, plus the rule
-toggles (`--fog-of-war`, `--skynet`, `--attack-with-all`,
-`--incremental-cards`, `--expanded-maneuver`, `--attack-card-reroll`,
-`--commander-die`).
+Run the generated `winrisk_app` executable from the configured build directory.
 
-## REST API
-The client speaks a small JSON API under `/api` (games CRUD, place / attack /
-maneuver / end-phase / trade actions, saves, maps) and receives live state
-frames on the STOMP WebSocket topic `/topic/games/{id}` via `/ws`. See
-`com.winrisk.web.api.GameController` for the full surface.
+## Android build
 
-## Repository structure
-- `src/main/java/com/winrisk/game` – the game engine (rules, AI, maps, missions, serialization)
-- `src/main/java/com/winrisk/web` – Spring Boot server: sessions, REST API, WebSocket push, AI stepper
-- `frontend/` – React SPA (Vite + TypeScript), built into the boot jar
-- `src/test/java` – JUnit suites for the engine and the web layer
+Configure with the Qt for Android toolchain and Android SDK/NDK paths, then build the generated `apk` target:
 
-## Notes
-- The former Swing desktop client was removed in the web conversion (it lives
-  in git history); the in-game map editor went with it. Custom maps can still
-  be loaded from files.
-- Interactive dice/occupation prompts and human setup placement use sensible
-  defaults (max dice, max occupation, automatic setup); making them
-  interactive over the WebSocket is a planned follow-up.
+```bash
+qt-cmake -S . -B build/android -GNinja \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
+  -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+cmake --build build/android --target apk
+```
 
-A coverage report is generated under `build/reports/jacoco`; the build fails
-below the configured threshold.
+The application is native Qt/C++; it does not need a WinRisk server or network connection.
+
+## Architecture
+
+```text
+QML / Qt Quick
+      |
+AppController + BoardModel
+      |
+Pure C++ GameEngine
+```
+
+The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
+
+## Persistence
+
+New saves are versioned JSON and contain stable player/territory IDs plus the complete RNG state. They do not serialize C++ object layouts or pointers.
+
+The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Capital, Secret Mission, two-player neutral-army saves, historical/custom maps, cards and remaining optional-rule state are deliberately rejected until those systems are migrated rather than silently loading them incorrectly.
+
+## Remaining Java parity work
+
+The C++ milestone is playable but does not yet cover every feature of the Java version. Remaining migration work includes:
+
+- Risk cards and trade rules
+- Secret Mission mode
+- Capital mode
+- official two-player neutral-army setup
+- fog of war and remaining optional rules
+- historical and procedural maps
+- full Java save parity for those systems
+- richer AI strategies
+- replay/action log
+- WebAssembly and iOS CI packaging
+
+Once those parity gates pass, the legacy Java, Spring Boot, React, Gradle and libGDX migration code can be deleted.
