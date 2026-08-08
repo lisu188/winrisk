@@ -1,89 +1,69 @@
 # WinRisk
 
-WinRisk is a web implementation of the classic world domination board game:
-a **Spring Boot** server wrapping a pure-Java game engine, with a **React**
-single-page client rendered on canvas. Play solo against 1–4 AI opponents;
-the server hosts many concurrent games.
+WinRisk is a Java implementation of the classic world-domination board game built with **libGDX**. The game engine, AI and UI run in the same process on desktop and Android. There is no Spring Boot server, REST API, WebSocket layer, React frontend or WebView in the runtime.
 
-## Prerequisites
+## Requirements
+
 - Java 17 or newer
-- Node.js 22 or newer (only for building/serving the web client)
+- Android SDK 36 for Android builds
 
-## Build and run
-
-```bash
-./gradlew build                 # engine + web tests, coverage gate, boot jar with the SPA
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
-```
-
-Open http://localhost:8080 — create a game in the lobby and play. Add
-`--server.port=<port>` to change the port, or `-PskipFrontend` to the build to
-produce a jar without the web client.
-
-For frontend development run the API and the Vite dev server side by side:
+## Desktop
 
 ```bash
-./gradlew bootRun               # API on :8080
-cd frontend && npm install && npm run dev    # UI on :5173, proxied to :8080
+./gradlew run
 ```
+
+The desktop launcher uses libGDX's LWJGL3 backend.
+
+## Android
+
+```bash
+./gradlew :android:assembleDebug
+```
+
+The APK is produced at:
+
+```text
+android/build/outputs/apk/debug/android-debug.apk
+```
+
+The Android application is fully local and does not require a WinRisk server or network connection.
+
+## Build and test
+
+```bash
+./gradlew build
+./gradlew test
+```
+
+`build` runs the engine tests, compiles the desktop client and builds the Android debug APK.
 
 ## Playing
-- **REINFORCE**: click your territory to place one troop ("place all" toggle
-  places everything); trade card sets from the panel when you hold three or
-  more (forced at five).
-- **ATTACK**: click your territory, then an adjacent enemy; dice results pop up
-  as toasts and conquests resolve automatically.
-- **MOVE**: click a source, then a connected territory, choose the troop count.
-- End Phase hands over; AI turns animate live over a WebSocket.
 
-Game modes: World Domination (classic), Secret Mission, Capital. Optional
-rules: attack-with-all, fog of war, skynet, incremental card values, expanded
-maneuver, attack card reroll, commander die.
+- **REINFORCE**: tap your territory to place one army. Enable `Place all` to place all available reinforcements at once.
+- **ATTACK**: tap one of your territories with at least two armies, then tap an adjacent enemy territory.
+- **MOVE**: tap a source territory and then a connected owned territory. Each destination tap moves one army.
+- **Trade cards**: during reinforcement, the button trades the first legal set.
+- **End phase**: advances the game. AI turns are stepped visibly by the client.
+- **Save / Load**: uses a local `saves/quick.save.json` save.
 
-## Maps
-Built-in boards: the classic 42-territory **World** map plus four historical
-supercontinents — **Pangaea**, **Laurasia**, **Gondwana**, **Rodinia** — and
-procedurally generated random maps. Custom `.map` files placed in a `maps/`
-directory next to the server appear in the lobby's map list.
+The rules engine still supports Classic, Secret Mission and Capital modes, the built-in historical maps, random maps and the existing optional rules. The initial libGDX setup screen currently starts a Classic World game with one human and three AI players.
 
-## Saving
-Games can be saved from the HUD and resumed from the lobby. Saves are JSON
-files in a `saves/` directory next to the server; the format is unchanged from
-earlier releases, so old saves still load.
+## Architecture
 
-## Headless simulation
-The same jar runs AI-only simulations without starting the server:
+- `core/` – libGDX application, Scene2D UI and board renderer
+- `lwjgl3/` – desktop launcher
+- `android/` – Android launcher and APK packaging
+- `src/main/java/com/winrisk/game/` – shared rules engine, AI, maps, missions and serialization
+- `src/main/resources/` – built-in map resources
+- `src/test/java/com/winrisk/game/` – engine tests
 
-```bash
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar --headless-play \
-    --map=pangaea --ai-players=4 --seed=42 --mode=classic
-```
+The previous Spring Boot server under `src/main/java/com/winrisk/web/` and React frontend under `frontend/` are retained only as migration history. They are excluded from the active Gradle build.
 
-Flags: `--map=<builtin or path>`, `--mode=<classic|secret|capital>`,
-`--ai-players=<1..5>`, `--seed=<long>`, `--max-turns=<n>`, plus the rule
-toggles (`--fog-of-war`, `--skynet`, `--attack-with-all`,
-`--incremental-cards`, `--expanded-maneuver`, `--attack-card-reroll`,
-`--commander-die`).
+## Platform portability
 
-## REST API
-The client speaks a small JSON API under `/api` (games CRUD, place / attack /
-maneuver / end-phase / trade actions, saves, maps) and receives live state
-frames on the STOMP WebSocket topic `/topic/games/{id}` via `/ws`. See
-`com.winrisk.web.api.GameController` for the full surface.
+The game engine no longer depends on `java.awt.Color`. Player and continent colors use a small platform-neutral ARGB value type, allowing the same engine to run directly on Android. JSON saves continue to store the same ARGB integer representation used previously.
 
-## Repository structure
-- `src/main/java/com/winrisk/game` – the game engine (rules, AI, maps, missions, serialization)
-- `src/main/java/com/winrisk/web` – Spring Boot server: sessions, REST API, WebSocket push, AI stepper
-- `frontend/` – React SPA (Vite + TypeScript), built into the boot jar
-- `src/test/java` – JUnit suites for the engine and the web layer
+## Current UI scope
 
-## Notes
-- The former Swing desktop client was removed in the web conversion (it lives
-  in git history); the in-game map editor went with it. Custom maps can still
-  be loaded from files.
-- Interactive dice/occupation prompts and human setup placement use sensible
-  defaults (max dice, max occupation, automatic setup); making them
-  interactive over the WebSocket is a planned follow-up.
-
-A coverage report is generated under `build/reports/jacoco`; the build fails
-below the configured threshold.
+The libGDX client provides the complete turn loop needed for local play: reinforcement, attacks, maneuvering, card trading, AI turns, game-over detection and local save/load. It currently renders the board from map coordinates and connections rather than reproducing every visual detail of the former React client. Further UI work can be done entirely in the shared libGDX `core` module and automatically applies to both desktop and Android.
