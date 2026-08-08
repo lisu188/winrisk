@@ -3,13 +3,13 @@ package com.winrisk.game.object;
 import com.winrisk.game.TestUtil;
 import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.rules.RiskCard;
+import com.winrisk.game.util.GameColor;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.view.Game;
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PatchList;
 import org.junit.Test;
 
-import java.awt.Color;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -19,7 +19,7 @@ import static org.junit.Assert.*;
 public class ObjectTests {
     @Test
     public void fieldOperationsMoveAndRein() {
-        Player p = new Player(Color.RED, PlayerFactory.getHuman());
+        Player p = new Player(GameColor.RED, PlayerFactory.getHuman());
         Field from = new Field(new PointF(0,0));
         Field to = new Field(new PointF(1,1));
         from.setPlayer(p);
@@ -60,8 +60,8 @@ public class ObjectTests {
         PatchList patches = p1.getPatchList(game);
         assertTrue(patches.size() > 0);
 
-        Player dead = new Player(Color.PINK, PlayerFactory.getHuman());
-        p1.takeCards(dead, game); // should not throw
+        Player dead = new Player(GameColor.PINK, PlayerFactory.getHuman());
+        p1.takeCards(dead, game);
     }
 
     @Test
@@ -92,7 +92,7 @@ public class ObjectTests {
 
         Player copy = new Player(p.getColor(), PlayerFactory.getHuman());
         assertEquals(p, copy);
-        Player other = new Player(Color.PINK, PlayerFactory.getHuman());
+        Player other = new Player(GameColor.PINK, PlayerFactory.getHuman());
         assertNotEquals(p, other);
         other.obtainField(new Field(new PointF(5,5)));
     }
@@ -121,8 +121,8 @@ public class ObjectTests {
         other.addField(outside);
         assertEquals(1, continent.getBorderCount());
 
-        Player p1 = new Player(Color.RED, PlayerFactory.getHuman());
-        Player p2 = new Player(Color.BLUE, PlayerFactory.getRandomAI());
+        Player p1 = new Player(GameColor.RED, PlayerFactory.getHuman());
+        Player p2 = new Player(GameColor.BLUE, PlayerFactory.getRandomAI());
         a.setPlayer(p1);
         b.setPlayer(p1);
         c.setPlayer(p2);
@@ -140,11 +140,10 @@ public class ObjectTests {
 
     @Test
     public void playerEqualsAndHashCodeHonorContract() {
-        Player p = new Player(Color.RED, PlayerFactory.getHuman());
+        Player p = new Player(GameColor.RED, PlayerFactory.getHuman());
         Player copy = new Player(p.getColor(), PlayerFactory.getRandomAI());
-        Player other = new Player(Color.BLUE, PlayerFactory.getHuman());
+        Player other = new Player(GameColor.BLUE, PlayerFactory.getHuman());
 
-        // Equal players must share a hash code so hash-based collections work.
         assertEquals(p, copy);
         assertEquals(p.hashCode(), copy.hashCode());
 
@@ -161,7 +160,6 @@ public class ObjectTests {
     @Test
     public void playerHashCodeToleratesNullColor() {
         Player nullColor = new Player(null, PlayerFactory.getHuman());
-        // Must not throw and must stay consistent with equals.
         assertEquals(nullColor.hashCode(), nullColor.hashCode());
         assertEquals(nullColor, new Player(null, PlayerFactory.getRandomAI()));
         assertEquals(nullColor.hashCode(), new Player(null, PlayerFactory.getHuman()).hashCode());
