@@ -61,4 +61,5 @@ endif()
 install(TARGETS winrisk_app
     BUNDLE DESTINATION .
     RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
 )
