@@ -13,6 +13,7 @@ public final class GameColor implements Serializable {
     public static final GameColor GREEN = new GameColor(0x00FF00);
     public static final GameColor LIGHT_GRAY = new GameColor(0xC0C0C0);
     public static final GameColor MAGENTA = new GameColor(0xFF00FF);
+    public static final GameColor PINK = new GameColor(0xFFAFAF);
     public static final GameColor YELLOW = new GameColor(0xFFFF00);
     public static final GameColor WHITE = new GameColor(0xFFFFFF);
 
