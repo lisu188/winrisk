@@ -1,7 +1,7 @@
 #include "engine/GameEngine.hpp"
 
+#include <algorithm>
 #include <cassert>
-#include <numeric>
 
 using namespace winrisk;
 
