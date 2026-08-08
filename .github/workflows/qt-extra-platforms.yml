@@ -1,0 +1,78 @@
+name: Qt Extra Platforms
+
+on:
+  push:
+    branches:
+      - qt-cpp
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/engine/**'
+      - 'src/qt/**'
+      - 'src/app/**'
+      - 'qml/**'
+      - '.github/workflows/qt-extra-platforms.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/engine/**'
+      - 'src/qt/**'
+      - 'src/app/**'
+      - 'qml/**'
+      - '.github/workflows/qt-extra-platforms.yml'
+  workflow_dispatch:
+
+jobs:
+  ios:
+    name: iOS simulator
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: mac
+          target: ios
+          cache: true
+
+      - name: Configure iOS simulator
+        run: >-
+          qt-cmake -S . -B build/ios -G Xcode
+          -DBUILD_TESTING=OFF
+          -DCMAKE_OSX_SYSROOT=iphonesimulator
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO
+
+      - name: Build iOS simulator
+        run: cmake --build build/ios --config Release --target winrisk_app --parallel
+
+  wasm:
+    name: WebAssembly single-threaded
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: all_os
+          target: wasm
+          arch: wasm_singlethread
+          cache: true
+
+      - name: Install Emscripten 4.0.7
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.7
+
+      - name: Build WebAssembly
+        shell: bash
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          qt-cmake -S . -B build/wasm -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build/wasm --parallel
+          test -n "$(find build/wasm -type f -name '*.wasm' -print -quit)"
