@@ -38,7 +38,7 @@ jobs:
           - os: ubuntu-24.04
             qt: '6.11.1'
           - os: windows-2025
-            qt: '6.11.0'
+            qt: '6.10.3'
           - os: macos-15
             qt: '6.11.1'
     runs-on: ${{ matrix.os }}
