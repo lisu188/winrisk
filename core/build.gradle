@@ -1,0 +1,40 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['../src/main/java', 'src/main/java']
+            include 'com/winrisk/game/**'
+            include 'com/winrisk/app/**'
+        }
+        resources {
+            srcDirs = ['../src/main/resources']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['../src/test/java']
+            include 'com/winrisk/game/**'
+        }
+    }
+}
+
+dependencies {
+    api "com.badlogicgames.gdx:gdx:${rootProject.gdxVersion}"
+    implementation "com.google.code.gson:gson:${rootProject.gsonVersion}"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+    testImplementation 'junit:junit:4.13.2'
+    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.12.2'
+}
+
+test {
+    useJUnitPlatform()
+}
