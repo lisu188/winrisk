@@ -25,8 +25,8 @@ import com.winrisk.game.serialization.Saveable;
 import com.winrisk.game.serialization.Serializer;
 import com.winrisk.game.serialization.Sketch;
 import com.winrisk.game.util.Colors;
+import com.winrisk.game.util.GameColor;
 
-import java.awt.Color;
 import java.util.List;
 import java.util.Random;
 
@@ -34,9 +34,7 @@ public class Game implements Saveable {
     private int curPlayer;
     private GamePhase curState;
     private Map map = new Map();
-
     private Params params = new Params();
-
     private PlayerList players;
     private MissionDeck missionDeck;
     private Player missionWinner;
@@ -63,10 +61,6 @@ public class Game implements Saveable {
         startNewGame();
     }
 
-    /**
-     * Creates an uninitialised game with no setup performed. Used when loading
-     * a saved game, where {@link #fromSketch(Sketch)} restores all state.
-     */
     public Game() {
     }
 
@@ -98,7 +92,6 @@ public class Game implements Saveable {
 
     public void setMap(Map map) {
         this.map = map;
-
     }
 
     public MapSketch getMapSketch() {
@@ -269,7 +262,8 @@ public class Game implements Saveable {
     }
 
     public void onAction() {
-        while (next()) ;
+        while (next()) {
+        }
     }
 
     public CombatResult attack(Field from, Field to) {
@@ -286,11 +280,6 @@ public class Game implements Saveable {
                     && from.getPatch().contains(to)
                     && from.move(to, troops);
         }
-        // Official rules allow a single fortification move of any number of
-        // armies from one territory to one connected territory. Once a route
-        // has been used this turn, only further moves along that same route are
-        // permitted (so a UI can move armies one at a time), while starting a
-        // different fortification is blocked.
         if (maneuverUsed && (from != maneuverSource || to != maneuverDestination)) {
             return false;
         }
@@ -317,7 +306,6 @@ public class Game implements Saveable {
             case REINFORCE:
                 onFromField(from);
                 break;
-
             case ATTACK:
                 if (from.getPlayer() != getPlayer()) {
                     return false;
@@ -329,7 +317,6 @@ public class Game implements Saveable {
                     return false;
                 }
                 return attack(from, to).isLegal();
-
             case MOVE:
                 return maneuver(from, to, 1);
             case UNDEFINED:
@@ -368,9 +355,6 @@ public class Game implements Saveable {
         serializer.load(this, path);
     }
 
-    /**
-     * Loads a previously saved game from the given path.
-     */
     public static Game loadGame(String path) {
         Game game = new Game();
         game.load(path);
@@ -400,7 +384,7 @@ public class Game implements Saveable {
 
         this.players = new PlayerList();
         for (GameSketch.PlayerData pd : gs.players) {
-            Player player = new Player(new Color(pd.colorRgb, true),
+            Player player = new Player(new GameColor(pd.colorRgb, true),
                     PlayerFactory.byClassName(pd.interfaceClass));
             player.setNeutral(pd.neutral);
             player.setRein(pd.reinforcements);
