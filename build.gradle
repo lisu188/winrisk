@@ -11,6 +11,14 @@ tasks.register('test') {
     dependsOn ':core:test'
 }
 
+tasks.register('build') {
+    dependsOn ':core:test', ':lwjgl3:classes', ':android:assembleDebug'
+}
+
+tasks.register('clean') {
+    dependsOn ':core:clean', ':lwjgl3:clean', ':android:clean'
+}
+
 tasks.register('run') {
     dependsOn ':lwjgl3:run'
 }
