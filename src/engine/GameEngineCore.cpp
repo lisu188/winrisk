@@ -1,11 +1,13 @@
 #include "engine/GameEngine.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <queue>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace winrisk {
 namespace {
@@ -24,6 +26,39 @@ bool validTradeTypes(const std::array<int, 4>& counts) {
     int distinct = 0;
     for (int type = 0; type < 3; ++type) if (counts[static_cast<std::size_t>(type)] > 0) ++distinct;
     return wild > 0 ? distinct <= 2 : distinct == 1 || distinct == 3;
+}
+
+bool validMapDefinition(const MapDefinition& map) {
+    if (map.id.empty() || map.territories.empty()) return false;
+    const int territoryCount = static_cast<int>(map.territories.size());
+    std::vector<int> membership(map.territories.size(), -1);
+
+    for (std::size_t i = 0; i < map.territories.size(); ++i) {
+        const auto& territory = map.territories[i];
+        if (territory.id != static_cast<int>(i) || territory.name.empty()
+            || !std::isfinite(territory.x) || !std::isfinite(territory.y)
+            || territory.x < 0.0f || territory.x > 1.0f || territory.y < 0.0f || territory.y > 1.0f) return false;
+        std::vector<bool> seen(map.territories.size(), false);
+        for (const int next : territory.adjacent) {
+            if (next < 0 || next >= territoryCount || next == territory.id || seen[static_cast<std::size_t>(next)]) return false;
+            seen[static_cast<std::size_t>(next)] = true;
+            const auto& reverse = map.territories[static_cast<std::size_t>(next)].adjacent;
+            if (std::find(reverse.begin(), reverse.end(), territory.id) == reverse.end()) return false;
+        }
+    }
+
+    for (std::size_t i = 0; i < map.continents.size(); ++i) {
+        const auto& continent = map.continents[i];
+        if (continent.id != static_cast<int>(i) || continent.bonus < 0 || continent.territories.empty()) return false;
+        for (const int territoryId : continent.territories) {
+            if (territoryId < 0 || territoryId >= territoryCount || membership[static_cast<std::size_t>(territoryId)] >= 0) return false;
+            membership[static_cast<std::size_t>(territoryId)] = continent.id;
+        }
+    }
+    for (std::size_t i = 0; i < map.territories.size(); ++i) {
+        if (map.territories[i].continent != membership[i]) return false;
+    }
+    return true;
 }
 }
 
@@ -72,6 +107,7 @@ bool GameEngine::startNewGame(
     territories_ = definition->territories;
     continents_ = definition->continents;
     mapId_ = definition->id;
+    mapDisplayName_ = definition->displayName;
     cardCatalog_ = makeRiskDeck(static_cast<int>(territories_.size()));
     random_ = Random(seed); mode_ = mode; rules_ = rules;
     phase_ = Phase::Reinforce; currentPlayer_ = 0; winner_ = -1; turn_ = 1; tradeCount_ = 0; conqueredThisTurn_ = false;
@@ -249,6 +285,7 @@ const std::vector<Card>& GameEngine::deck() const { return deck_; }
 const std::vector<Card>& GameEngine::discard() const { return discard_; }
 const Player* GameEngine::currentPlayer() const { return currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size()) ? nullptr : &players_[static_cast<std::size_t>(currentPlayer_)]; }
 const std::string& GameEngine::mapId() const { return mapId_; }
+const std::string& GameEngine::mapDisplayName() const { return mapDisplayName_; }
 GameMode GameEngine::mode() const { return mode_; }
 const RulesOptions& GameEngine::rules() const { return rules_; }
 bool GameEngine::commanderDieUsed() const { return commanderDieUsed_; }
@@ -287,6 +324,18 @@ Snapshot GameEngine::snapshot() const {
     result.version = 6; result.mapId = mapId_; result.mode = mode_; result.rules = rules_; result.phase = phase_; result.currentPlayer = currentPlayer_; result.winner = winner_; result.turn = turn_; result.rngState = random_.state();
     result.players = players_; result.territories = territories_; result.deck = deck_; result.discard = discard_; result.tradeCount = tradeCount_; result.conqueredThisTurn = conqueredThisTurn_;
     result.commanderDieUsed = commanderDieUsed_; result.maneuverUsed = maneuverUsed_; result.maneuverSource = maneuverSource_; result.maneuverTarget = maneuverTarget_;
+    if (!makeBuiltinMap(mapId_)) {
+        MapDefinition embedded;
+        embedded.id = mapId_;
+        embedded.displayName = mapDisplayName_;
+        embedded.territories = territories_;
+        embedded.continents = continents_;
+        for (auto& territory : embedded.territories) {
+            territory.owner = -1;
+            territory.armies = 0;
+        }
+        result.mapDefinition = std::move(embedded);
+    }
     return result;
 }
 
@@ -294,8 +343,12 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     if (snapshot.version < 2 || snapshot.version > 6 || snapshot.players.size() < 2 || snapshot.players.size() > 5) return false;
 
     const std::string restoredMapId = snapshot.mapId.empty() ? "world" : snapshot.mapId;
-    const auto definition = makeBuiltinMap(restoredMapId);
-    if (!definition || snapshot.territories.size() != definition->territories.size()) return false;
+    std::optional<MapDefinition> definition = makeBuiltinMap(restoredMapId);
+    if (!definition) {
+        if (!snapshot.mapDefinition || snapshot.mapDefinition->id != restoredMapId || !validMapDefinition(*snapshot.mapDefinition)) return false;
+        definition = snapshot.mapDefinition;
+    }
+    if (snapshot.territories.size() != definition->territories.size()) return false;
     const int territoryCountValue = static_cast<int>(definition->territories.size());
     const auto catalog = makeRiskDeck(territoryCountValue);
     const auto validCardId = [&](int cardId) { return cardId >= 0 && cardId < static_cast<int>(catalog.size()); };
@@ -367,6 +420,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     }
 
     mapId_ = definition->id;
+    mapDisplayName_ = definition->displayName.empty() ? definition->id : definition->displayName;
     mode_ = restoredMode;
     rules_ = snapshot.version >= 5 ? snapshot.rules : RulesOptions{};
     if (snapshot.version < 6) {
