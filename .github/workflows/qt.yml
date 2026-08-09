@@ -12,6 +12,7 @@ on:
       - 'src/qt/**'
       - 'src/app/**'
       - 'qml/**'
+      - 'platform/**'
       - 'tests/**'
       - '.github/workflows/qt.yml'
   pull_request:
@@ -24,6 +25,7 @@ on:
       - 'src/qt/**'
       - 'src/app/**'
       - 'qml/**'
+      - 'platform/**'
       - 'tests/**'
       - '.github/workflows/qt.yml'
   workflow_dispatch:
@@ -106,4 +108,68 @@ jobs:
         with:
           name: WinRisk-android-arm64
           path: WinRisk-android-arm64.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS arm64 compile
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: mac
+          target: ios
+          cache: true
+
+      - name: Configure iOS
+        run: >-
+          qt-cmake -S . -B build/ios -GXcode
+          -DBUILD_TESTING=OFF
+          -DCMAKE_OSX_SYSROOT=iphoneos
+
+      - name: Build iOS
+        run: cmake --build build/ios --config Release --target winrisk_app -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+
+  wasm:
+    name: WebAssembly single-thread
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten 4.0.7
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.7
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: all_os
+          target: wasm
+          arch: wasm_singlethread
+          cache: true
+
+      - name: Configure WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          qt-cmake -S . -B build/wasm -GNinja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+
+      - name: Build WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --build build/wasm --parallel
+
+      - name: Collect WebAssembly
+        run: |
+          mkdir -p WinRisk-web
+          find build/wasm -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.wasm' -o -name '*.data' \) -exec cp {} WinRisk-web/ \;
+          test -n "$(find WinRisk-web -type f -name '*.wasm' -print -quit)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-webassembly
+          path: WinRisk-web
           if-no-files-found: error
