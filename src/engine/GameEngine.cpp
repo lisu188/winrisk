@@ -34,16 +34,23 @@ std::vector<int> range(int first, int lastInclusive) {
 
 bool validTradeTypes(const std::array<int, 4>& counts) {
     const int wild = counts[static_cast<std::size_t>(CardType::Wild)];
-    if (wild == 3) {
-        return true;
-    }
-    for (int type = 0; type < 3; ++type) {
-        if (counts[static_cast<std::size_t>(type)] + wild == 3) {
-            return true;
-        }
+    if (wild > 2) {
+        return false;
     }
     const int nonWild = counts[0] + counts[1] + counts[2];
-    return counts[0] <= 1 && counts[1] <= 1 && counts[2] <= 1 && nonWild + wild == 3;
+    if (nonWild <= 1) {
+        return true;
+    }
+    int distinct = 0;
+    for (int type = 0; type < 3; ++type) {
+        if (counts[static_cast<std::size_t>(type)] > 0) {
+            ++distinct;
+        }
+    }
+    if (wild > 0) {
+        return distinct <= 2;
+    }
+    return distinct == 1 || distinct == 3;
 }
 
 }
@@ -287,6 +294,7 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
         conqueredThisTurn_ = true;
         if (defendingPlayer >= 0 && territoryCount(defendingPlayer) == 0) {
             transferCards(defendingPlayer, currentPlayer_);
+            tradeAfterElimination(currentPlayer_);
         }
     }
     if (defendingPlayer >= 0) {
@@ -349,11 +357,11 @@ const Card* GameEngine::findCard(int cardId) const {
     return &catalog[static_cast<std::size_t>(cardId)];
 }
 
-int GameEngine::tradeCards() {
-    if (phase_ != Phase::Reinforce || currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size())) {
+int GameEngine::tradeCardsForPlayer(int playerId) {
+    if (playerId < 0 || playerId >= static_cast<int>(players_.size())) {
         return 0;
     }
-    auto& player = players_[static_cast<std::size_t>(currentPlayer_)];
+    auto& player = players_[static_cast<std::size_t>(playerId)];
     const auto set = findTradeSet(player);
     if (!set) {
         return 0;
@@ -380,13 +388,35 @@ int GameEngine::tradeCards() {
         const Card* card = findCard(id);
         if (card != nullptr && card->territoryId >= 0 && validTerritory(card->territoryId)) {
             auto& territory = territories_[static_cast<std::size_t>(card->territoryId)];
-            if (territory.owner == currentPlayer_) {
+            if (territory.owner == playerId) {
                 territory.armies += 2;
                 break;
             }
         }
     }
     return bonus;
+}
+
+void GameEngine::tradeAfterElimination(int playerId) {
+    if (playerId < 0 || playerId >= static_cast<int>(players_.size())) {
+        return;
+    }
+    auto& player = players_[static_cast<std::size_t>(playerId)];
+    if (player.cards.size() < 6) {
+        return;
+    }
+    while (player.cards.size() > 4 && findTradeSet(player).has_value()) {
+        if (tradeCardsForPlayer(playerId) <= 0) {
+            break;
+        }
+    }
+}
+
+int GameEngine::tradeCards() {
+    if (phase_ != Phase::Reinforce || currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size())) {
+        return 0;
+    }
+    return tradeCardsForPlayer(currentPlayer_);
 }
 
 bool GameEngine::endPhase() {
@@ -624,7 +654,7 @@ void GameEngine::beginTurn() {
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
-    players_[static_cast<std::size_t>(currentPlayer_)].reinforcements = reinforcementCount(currentPlayer_);
+    players_[static_cast<std::size_t>(currentPlayer_)].reinforcements += reinforcementCount(currentPlayer_);
 }
 
 void GameEngine::advancePlayer() {
