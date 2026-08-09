@@ -91,6 +91,29 @@ Snapshot neutralScaleSnapshot(bool skynet) {
     return snapshot;
 }
 
+Snapshot continentReinforcementSnapshot() {
+    Snapshot snapshot = activeSnapshot(AiStrategy::Continent, Phase::Reinforce);
+    snapshot.players[0].reinforcements = 5;
+    for (auto& territory : snapshot.territories) {
+        territory.owner = 1;
+        territory.armies = 2;
+    }
+
+    const auto continents = GameEngine::makeWorldContinents();
+    const auto& goal = continents.front();
+    for (std::size_t i = 0; i < 3; ++i) {
+        snapshot.territories[static_cast<std::size_t>(goal.territories[i])].owner = 0;
+    }
+
+    const auto outsideGoal = std::find_if(snapshot.territories.begin(), snapshot.territories.end(), [&](const Territory& territory) {
+        return std::find(goal.territories.begin(), goal.territories.end(), territory.id) == goal.territories.end();
+    });
+    if (outsideGoal != snapshot.territories.end()) {
+        outsideGoal->owner = 2;
+    }
+    return snapshot;
+}
+
 }
 
 int main() {
@@ -137,6 +160,31 @@ int main() {
         }
         CHECK(changed == 1);
         CHECK(added == 5);
+    }
+
+    {
+        const Snapshot snapshot = continentReinforcementSnapshot();
+        GameEngine game;
+        CHECK(game.restore(snapshot));
+        const auto continents = GameEngine::makeWorldContinents();
+        const auto& goal = continents.front();
+        CHECK(game.continentGoalFor(0) == goal.id);
+
+        std::array<int, 3> before{};
+        for (std::size_t i = 0; i < before.size(); ++i) {
+            before[i] = game.territories()[static_cast<std::size_t>(goal.territories[i])].armies;
+        }
+        CHECK(game.runAiReinforcePhase());
+        for (std::size_t i = 0; i < before.size(); ++i) {
+            CHECK(game.territories()[static_cast<std::size_t>(goal.territories[i])].armies == before[i] + 1);
+        }
+        CHECK(game.players()[0].reinforcements == 2);
+
+        GameEngine phaseGame;
+        CHECK(phaseGame.restore(snapshot));
+        CHECK(phaseGame.aiStep());
+        CHECK(phaseGame.phase() == Phase::Attack);
+        CHECK(phaseGame.players()[0].reinforcements == 2);
     }
 
     {
