@@ -3,6 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 Item {
+    id: root
+
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
@@ -11,98 +13,132 @@ Item {
         }
     }
 
-    ColumnLayout {
-        anchors.centerIn: parent
-        width: Math.min(parent.width - 40, 520)
-        spacing: 18
+    ScrollView {
+        anchors.fill: parent
+        clip: true
+        contentWidth: availableWidth
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "WINRISK"
-            color: "#f2f4f8"
-            font.pixelSize: 48
-            font.bold: true
-            font.letterSpacing: 4
-        }
+        ColumnLayout {
+            x: Math.max(20, (root.width - width) / 2)
+            width: Math.min(root.width - 40, 520)
+            spacing: 18
 
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Native C++ / Qt Quick"
-            color: "#9aa7b4"
-            font.pixelSize: 15
-        }
+            Item { Layout.preferredHeight: 12 }
 
-        Frame {
-            Layout.fillWidth: true
-            padding: 20
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: "WINRISK"
+                color: "#f2f4f8"
+                font.pixelSize: 48
+                font.bold: true
+                font.letterSpacing: 4
+            }
 
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 14
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                text: "Native C++ / Qt Quick"
+                color: "#9aa7b4"
+                font.pixelSize: 15
+            }
 
-                Label { text: "Game mode"; font.bold: true }
-                ComboBox {
-                    id: gameMode
-                    Layout.fillWidth: true
-                    model: ["Classic", "Secret Mission", "Capital"]
-                    onCurrentIndexChanged: {
-                        if (playerCount.value < playerCount.from)
-                            playerCount.value = playerCount.from
+            Frame {
+                Layout.fillWidth: true
+                padding: 20
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 14
+
+                    Label { text: "Game mode"; font.bold: true }
+                    ComboBox {
+                        id: gameMode
+                        Layout.fillWidth: true
+                        model: ["Classic", "Secret Mission", "Capital"]
+                        onCurrentIndexChanged: {
+                            if (playerCount.value < playerCount.from)
+                                playerCount.value = playerCount.from
+                        }
+                    }
+
+                    Label { text: "Players"; font.bold: true }
+                    SpinBox {
+                        id: playerCount
+                        Layout.fillWidth: true
+                        from: gameMode.currentIndex === 0 ? 2 : 3
+                        to: 5
+                        value: 4
+                    }
+
+                    Label { text: "Human players"; font.bold: true }
+                    SpinBox {
+                        id: humanPlayers
+                        Layout.fillWidth: true
+                        from: 1
+                        to: playerCount.value
+                        value: 1
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        visible: gameMode.currentIndex !== 0
+                        text: gameMode.currentIndex === 1
+                              ? "Each player receives a hidden objective. First player to complete their mission wins."
+                              : "Each player has an original headquarters. Capture every HQ while retaining your own to win."
+                        color: "#9aa7b4"
+                        wrapMode: Text.Wrap
+                    }
+
+                    Label { text: "Optional rules"; font.bold: true }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: root.width < 460 ? 1 : 2
+                        columnSpacing: 10
+                        rowSpacing: 2
+
+                        CheckBox { id: incrementalCards; text: "Incremental card values" }
+                        CheckBox { id: expandedManeuver; text: "Expanded maneuver" }
+                        CheckBox { id: attackCardReroll; text: "Attack-card reroll" }
+                        CheckBox { id: commanderDie; text: "Commander die" }
+                        CheckBox { id: attackWithAll; text: "Attack with all" }
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 52
+                        text: "New Game"
+                        font.bold: true
+                        onClicked: appController.startNewGame(
+                            playerCount.value,
+                            humanPlayers.value,
+                            gameMode.currentIndex,
+                            incrementalCards.checked,
+                            expandedManeuver.checked,
+                            attackCardReroll.checked,
+                            commanderDie.checked,
+                            attackWithAll.checked
+                        )
+                    }
+
+                    Button {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 48
+                        text: "Continue Quick Save"
+                        onClicked: appController.quickLoad()
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: appController.status
+                        color: "#d5dde5"
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignHCenter
+                        visible: text.length > 0
                     }
                 }
-
-                Label { text: "Players"; font.bold: true }
-                SpinBox {
-                    id: playerCount
-                    Layout.fillWidth: true
-                    from: gameMode.currentIndex === 0 ? 2 : 3
-                    to: 5
-                    value: 4
-                }
-
-                Label { text: "Human players"; font.bold: true }
-                SpinBox {
-                    id: humanPlayers
-                    Layout.fillWidth: true
-                    from: 1
-                    to: playerCount.value
-                    value: 1
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    visible: gameMode.currentIndex !== 0
-                    text: gameMode.currentIndex === 1
-                          ? "Each player receives a hidden objective. First player to complete their mission wins."
-                          : "Each player has an original headquarters. Capture every HQ while retaining your own to win."
-                    color: "#9aa7b4"
-                    wrapMode: Text.Wrap
-                }
-
-                Button {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 52
-                    text: "New Game"
-                    font.bold: true
-                    onClicked: appController.startNewGame(playerCount.value, humanPlayers.value, gameMode.currentIndex)
-                }
-
-                Button {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 48
-                    text: "Continue Quick Save"
-                    onClicked: appController.quickLoad()
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: appController.status
-                    color: "#d5dde5"
-                    wrapMode: Text.Wrap
-                    horizontalAlignment: Text.AlignHCenter
-                    visible: text.length > 0
-                }
             }
+
+            Item { Layout.preferredHeight: 18 }
         }
     }
 }
