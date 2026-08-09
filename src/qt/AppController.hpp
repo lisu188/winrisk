@@ -19,6 +19,7 @@ public:
         ArmiesRole,
         OwnerIdRole,
         OwnerColorRole,
+        HeadquartersOwnerIdRole,
         SelectedRole
     };
     Q_ENUM(Role)
