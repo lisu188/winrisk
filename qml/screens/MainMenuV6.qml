@@ -60,8 +60,49 @@ Item {
                             { text: "Pangaea (~250 Ma)", value: "pangaea" },
                             { text: "Laurasia (~150 Ma)", value: "laurasia" },
                             { text: "Gondwana (~420 Ma)", value: "gondwana" },
-                            { text: "Rodinia (~1 Ga)", value: "rodinia" }
+                            { text: "Rodinia (~1 Ga)", value: "rodinia" },
+                            { text: "Random / procedural", value: "random" }
                         ]
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        visible: mapChoice.currentValue === "random"
+                        columns: root.width < 480 ? 1 : 2
+                        columnSpacing: 10
+                        rowSpacing: 6
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Label { text: "Territories"; font.bold: true }
+                            SpinBox {
+                                id: randomFields
+                                Layout.fillWidth: true
+                                from: Math.max(3, playerCount.value)
+                                to: 100
+                                value: 30
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Label { text: "Regions"; font.bold: true }
+                            SpinBox {
+                                id: randomContinents
+                                Layout.fillWidth: true
+                                from: 1
+                                to: Math.min(12, randomFields.value)
+                                value: Math.min(6, to)
+                            }
+                        }
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        visible: mapChoice.currentValue === "random"
+                        text: "Each new game generates a connected board from a fresh seed. The generated topology is encoded in the save identity so quick-save/load recreates the same board."
+                        color: "#9aa7b4"
+                        wrapMode: Text.Wrap
                     }
 
                     Label { text: "Game mode"; font.bold: true }
@@ -106,7 +147,7 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         visible: gameMode.currentIndex === 1 && mapChoice.currentValue !== "world"
-                        text: "Java parity note: historical boards keep the original mission deck. On smaller boards, some fixed 24/18/15-territory objectives can be impossible."
+                        text: "Java parity note: non-world boards keep the original mission deck. On smaller boards, some fixed 24/18/15-territory objectives can be impossible."
                         color: "#d7b46a"
                         wrapMode: Text.Wrap
                     }
@@ -149,19 +190,24 @@ Item {
                         Layout.preferredHeight: 52
                         text: "New Game"
                         font.bold: true
-                        onClicked: appController.startNewGame(
-                            playerCount.value,
-                            humanPlayers.value,
-                            gameMode.currentIndex,
-                            incrementalCards.checked,
-                            expandedManeuver.checked,
-                            attackCardReroll.checked,
-                            commanderDie.checked,
-                            attackWithAll.checked,
-                            fogOfWar.checked,
-                            skynet.checked,
-                            mapChoice.currentValue
-                        )
+                        onClicked: {
+                            const selectedMap = mapChoice.currentValue === "random"
+                                ? "random:" + randomFields.value + ":" + randomContinents.value + ":" + Math.floor(Date.now())
+                                : mapChoice.currentValue
+                            appController.startNewGame(
+                                playerCount.value,
+                                humanPlayers.value,
+                                gameMode.currentIndex,
+                                incrementalCards.checked,
+                                expandedManeuver.checked,
+                                attackCardReroll.checked,
+                                commanderDie.checked,
+                                attackWithAll.checked,
+                                fogOfWar.checked,
+                                skynet.checked,
+                                selectedMap
+                            )
+                        }
                     }
 
                     Button {
