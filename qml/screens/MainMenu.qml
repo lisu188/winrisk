@@ -40,11 +40,22 @@ Item {
                 anchors.fill: parent
                 spacing: 14
 
+                Label { text: "Game mode"; font.bold: true }
+                ComboBox {
+                    id: gameMode
+                    Layout.fillWidth: true
+                    model: ["Classic", "Secret Mission"]
+                    onCurrentIndexChanged: {
+                        if (playerCount.value < playerCount.from)
+                            playerCount.value = playerCount.from
+                    }
+                }
+
                 Label { text: "Players"; font.bold: true }
                 SpinBox {
                     id: playerCount
                     Layout.fillWidth: true
-                    from: 2
+                    from: gameMode.currentIndex === 1 ? 3 : 2
                     to: 5
                     value: 4
                 }
@@ -58,12 +69,20 @@ Item {
                     value: 1
                 }
 
+                Label {
+                    Layout.fillWidth: true
+                    visible: gameMode.currentIndex === 1
+                    text: "Each player receives a hidden objective. First player to complete their mission wins."
+                    color: "#9aa7b4"
+                    wrapMode: Text.Wrap
+                }
+
                 Button {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 52
                     text: "New Game"
                     font.bold: true
-                    onClicked: appController.startNewGame(playerCount.value, humanPlayers.value)
+                    onClicked: appController.startNewGame(playerCount.value, humanPlayers.value, gameMode.currentIndex)
                 }
 
                 Button {
