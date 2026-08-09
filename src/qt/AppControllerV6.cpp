@@ -1,5 +1,6 @@
 #include "qt/AppController.hpp"
 #include "qt/LegacyJavaImporter.hpp"
+#include "qt/MapDefinitionJson.hpp"
 
 #include <QDir>
 #include <QFile>
@@ -11,6 +12,7 @@
 #include <QStringList>
 
 #include <array>
+#include <optional>
 #include <utility>
 
 namespace {
@@ -100,6 +102,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     root.insert("schema", "winrisk-save");
     root.insert("version", snapshot.version);
     root.insert("mapId", QString::fromStdString(snapshot.mapId));
+    if (snapshot.mapDefinition) root.insert("mapDefinition", winrisk::qt::mapDefinitionToJson(*snapshot.mapDefinition));
     root.insert("mode", static_cast<int>(snapshot.mode));
     root.insert("rules", rulesToJson(snapshot.rules));
     root.insert("phase", static_cast<int>(snapshot.phase));
@@ -165,10 +168,20 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
     snapshot = {};
     snapshot.version = version;
     const QString requestedMapId = root.value("mapId").toString("world");
-    const auto definition = winrisk::GameEngine::makeBuiltinMap(requestedMapId.toStdString());
+    std::optional<winrisk::MapDefinition> definition = winrisk::GameEngine::makeBuiltinMap(requestedMapId.toStdString());
     if (!definition) {
-        error = "Unsupported WinRisk save map";
-        return false;
+        if (!root.value("mapDefinition").isObject()) {
+            error = "Unsupported WinRisk save map";
+            return false;
+        }
+        winrisk::MapDefinition embedded;
+        if (!winrisk::qt::mapDefinitionFromJson(root.value("mapDefinition").toObject(), embedded, error)) return false;
+        if (embedded.id != requestedMapId.toStdString()) {
+            error = "Embedded map id does not match mapId";
+            return false;
+        }
+        snapshot.mapDefinition = embedded;
+        definition = std::move(embedded);
     }
     snapshot.mapId = definition->id;
     const auto catalog = winrisk::GameEngine::makeRiskDeck(static_cast<int>(definition->territories.size()));
@@ -267,7 +280,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
     snapshot.territories = definition->territories;
     const QJsonArray territories = root.value("territories").toArray();
     if (territories.size() != static_cast<qsizetype>(snapshot.territories.size())) {
-        error = "Save territory count does not match its built-in map";
+        error = "Save territory count does not match its map";
         return false;
     }
     std::vector<bool> seen(snapshot.territories.size(), false);
@@ -386,10 +399,7 @@ AppController::AppController(QObject* parent) : QObject(parent), boardModel_(thi
 
 bool AppController::running() const { return !engine_.players().empty(); }
 QString AppController::mapId() const { return QString::fromStdString(engine_.mapId()); }
-QString AppController::mapText() const {
-    const auto definition = winrisk::GameEngine::makeBuiltinMap(engine_.mapId());
-    return definition ? QString::fromStdString(definition->displayName) : QString::fromStdString(engine_.mapId());
-}
+QString AppController::mapText() const { return QString::fromStdString(engine_.mapDisplayName()); }
 QString AppController::modeText() const { return QString::fromStdString(winrisk::modeName(engine_.mode())); }
 
 QString AppController::rulesText() const {
