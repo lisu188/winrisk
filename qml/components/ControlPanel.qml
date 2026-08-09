@@ -32,9 +32,32 @@ Frame {
 
         Label {
             Layout.fillWidth: true
-            text: appController.winnerText.length > 0 ? appController.winnerText : appController.phaseText
+            text: appController.modeText + "  •  "
+                  + (appController.winnerText.length > 0 ? appController.winnerText : appController.phaseText)
             font.pixelSize: 18
             font.bold: true
+        }
+
+        Frame {
+            Layout.fillWidth: true
+            visible: appController.missionText.length > 0
+            padding: 8
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: 3
+                Label {
+                    text: "Mission"
+                    font.bold: true
+                    color: "#ffcf70"
+                }
+                Label {
+                    Layout.fillWidth: true
+                    text: appController.missionText
+                    wrapMode: Text.Wrap
+                    color: "#e3e8ed"
+                }
+            }
         }
 
         Label {
