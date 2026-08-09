@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace winrisk {
 namespace {
@@ -196,6 +197,37 @@ std::string normalize(std::string value) {
     return value;
 }
 
+std::vector<std::string> split(const std::string& value, char delimiter) {
+    std::vector<std::string> parts;
+    std::size_t begin = 0;
+    for (;;) {
+        const std::size_t end = value.find(delimiter, begin);
+        parts.push_back(value.substr(begin, end == std::string::npos ? std::string::npos : end - begin));
+        if (end == std::string::npos) break;
+        begin = end + 1;
+    }
+    return parts;
+}
+
+std::optional<MapDefinition> proceduralFromId(const std::string& normalizedId) {
+    const auto parts = split(normalizedId, ':');
+    if (parts.size() != 4 || parts[0] != "random") return std::nullopt;
+    try {
+        std::size_t parsed = 0;
+        const int fields = std::stoi(parts[1], &parsed);
+        if (parsed != parts[1].size()) return std::nullopt;
+        parsed = 0;
+        const int continents = std::stoi(parts[2], &parsed);
+        if (parsed != parts[2].size()) return std::nullopt;
+        parsed = 0;
+        const std::uint64_t seed = std::stoull(parts[3], &parsed);
+        if (parsed != parts[3].size()) return std::nullopt;
+        return GameEngine::generateProceduralMap(fields, continents, seed);
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 }
 
 std::vector<std::string> GameEngine::builtinMapIds() {
@@ -209,6 +241,7 @@ std::optional<MapDefinition> GameEngine::makeBuiltinMap(const std::string& mapId
     if (id == "laurasia") return laurasia();
     if (id == "gondwana") return gondwana();
     if (id == "rodinia") return rodinia();
+    if (id.rfind("random:", 0) == 0) return proceduralFromId(id);
     return std::nullopt;
 }
 
