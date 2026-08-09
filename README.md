@@ -20,15 +20,19 @@ The `qt-cpp` implementation already contains:
 - deterministic 44-card Risk deck, conquest awards, elimination transfer and Java-compatible wildcard sets
 - progressive card trades, forced trades and immediate post-elimination trades
 - all seven recovered Java options: incremental cards, expanded maneuver, attack-card reroll, commander die, attack-with-all, fog-of-war and Skynet
-- Java-compatible Skynet target filtering: an AI source with an adjacent human enemy targets a human rather than an AI/Neutral target from that source
+- all five Java AI strategies: Easy, Continent, Balanced, BorderGuard and Random
+- Java-compatible AI strategy assignment by absolute seat index and persistence of strategy identity in native saves
+- Java `Field.getScale()` behavior: graph-distance decay, owner-relative fog visibility and Skynet interactive-player weighting
+- Java AI card-trade behavior: automatic trades are forced-only unless an explicit human trade action is made
+- Java-compatible Skynet semantics, including the original two-player Neutral quirk described below
 - viewer-aware fog-of-war with hidden owner/army/HQ data redacted before QML receives it
-- asynchronous one-action-at-a-time AI turns
+- asynchronous AI scheduling with one Java-equivalent strategy phase per Qt timer tick
 - Qt `QAbstractListModel` presentation layer
 - responsive Qt Quick desktop/tablet/phone v6 UI with mode/rule selection, mission/objective HUD and HQ badges
 - native quick-save/load using versioned JSON schema v6
 - migration of native schema-v2/v3/v4/v5 saves to v6
 - current Java Gson `GameSketch` import for Classic, Secret Mission and Capital on the standard world map
-- CTest engine, fog-model and Java-import regression suites
+- CTest engine, AI-strategy, fog-model and Java-import regression suites
 - CI definitions for Windows, Linux, macOS, Android, iOS and WebAssembly
 
 The legacy Java/Spring/React source remains on this migration branch only as a behavior and format reference. It is not linked into the C++ application and will be removed after the remaining parity gates pass.
@@ -88,6 +92,24 @@ Pure C++ GameEngine
 
 The engine is command-driven and does not expose mutable state to QML. UI actions call engine operations for reinforcement, cards, attack, maneuver and phase progression. AI uses the same operations and is scheduled asynchronously from Qt.
 
+## Java AI parity
+
+The native engine preserves the five AI controllers exposed by Java `PlayerFactory`:
+
+- **EasyAI:** reinforces the weakest scale position, repeatedly attacks sufficiently weaker adjacent targets, and moves armies from the strongest position toward the weakest border. Under Skynet it restricts a source's candidates to Java-"interactive" adjacent enemies when any exist.
+- **ContinentAI:** keeps a continent goal until that continent is owned, chooses the unowned continent with the greatest current player share, attacks in average-proximity-to-goal order and reinforces owned goal fields. Its Java behavior can leave reinforcement points unused and still advance phase; the native parity implementation intentionally preserves that quirk.
+- **BalancedAI:** concentrates reinforcement on the weakest border, makes one pass over scale-sorted border attacks using the Java strength threshold, then moves interior armies toward the weakest border.
+- **BorderGuardAI:** concentrates reinforcement on the weakest border, attacks only when a border has more than twice the target's armies, and moves interior armies toward weak borders.
+- **RandomAI:** distributes reinforcements randomly, makes one random border attack and attempts one random maneuver.
+
+The common Java scale function is also reproduced. For a territory, armies are weighted by `1 / 2^graphDistance`; friendly and enemy weights are accumulated to produce `enemy / friendly`. With fog enabled, Java evaluates only the **owner of that territory's** visible fields (owned fields plus immediate neighbors), not a single global viewer.
+
+Java's Skynet implementation has a non-obvious two-player quirk: Neutral is controlled by the unannotated `PlayerAI`, and Java `PlayerInterface.isInteractive()` therefore returns `true` for Neutral. Consequently EasyAI's Skynet target filter and `Field.getScale()` both treat Neutral as interactive alongside human players. The native compatibility implementation preserves this behavior rather than silently normalizing it.
+
+`PlayerFactory.getDefaultAI(index)` uses the absolute player-seat index modulo the five AI strategies. The C++ setup uses the same rule. For example, with one human in seat 0, AI seats 1–4 are Continent, Balanced, BorderGuard and Random respectively.
+
+AI strategy identity is persisted in native schema-v6 saves and reconstructed from Java `GameSketch.PlayerData.interfaceClass` when importing current Java saves. ContinentAI's goal itself is transient, matching Java's non-serialized AI-object state, so it is recalculated after load.
+
 ## Optional rules
 
 The v6 engine currently preserves these recovered Java semantics:
@@ -97,14 +119,14 @@ The v6 engine currently preserves these recovered Java semantics:
 - **Attack-card reroll:** a matching non-wild source/target card may improve the lowest attack die; the card is not consumed.
 - **Commander die:** once per turn the lowest attack die becomes 6 after the card reroll.
 - **Attack with all:** repeat battles until capture or until the source cannot continue attacking.
-- **Fog of war:** a human viewer sees owned territories and immediate neighbors; hidden ownership, armies and HQ state are redacted in the Qt model.
-- **Skynet:** when an AI attack source has at least one adjacent human enemy, targets from that source are restricted to humans. This preserves the explicit Java `EasyAI` Skynet branch. Full strategy-specific AI parity is separate work because the Java strategy classes also use scale/scoring logic not yet reproduced by the native AI.
+- **Fog of war:** a human viewer sees owned territories and immediate neighbors; hidden ownership, armies and HQ state are redacted in the Qt model. AI scale calculations separately preserve Java's owner-relative visibility behavior.
+- **Skynet:** EasyAI prefers adjacent Java-interactive targets, and scale calculations double the weight of Java-interactive fields. In the Java implementation this includes human players and the two-player Neutral controller.
 
 ## Persistence
 
-Native saves use JSON schema version 6 and contain the game mode, seven rule flags, stable player/territory/card IDs, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression, commander-die state, maneuver state and complete native RNG state. They do not serialize C++ object layouts or pointers.
+Native saves use JSON schema version 6 and contain the game mode, seven rule flags, stable player/territory/card IDs, AI strategy identity, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression, commander-die state, maneuver state and complete native RNG state. They do not serialize C++ object layouts or pointers.
 
-Native schema-v2 through schema-v5 saves remain loadable. Pre-v6 saves explicitly disable fog and Skynet because those fields did not exist in those schemas.
+Native schema-v2 through schema-v5 saves remain loadable. Pre-v6 saves explicitly disable fog and Skynet because those fields did not exist in those schemas. Early native schema-v6 saves that predate `aiStrategy` remain readable and default a missing strategy field to Easy.
 
 ### Current Java JSON import
 
@@ -114,7 +136,7 @@ For current Java JSON saves the converter preserves:
 
 - Classic, Secret Mission and Capital mode
 - two-player Classic Neutral ownership
-- player colors, human/AI classification and reinforcements
+- player colors, human/AI classification, exact supported AI strategy class and reinforcements
 - territory owners and armies
 - Secret Mission specifications and elimination targets
 - Capital headquarters
@@ -125,6 +147,9 @@ For current Java JSON saves the converter preserves:
 - draw pile and discard pile
 - Java draw order (`GameSketch.drawPile` is next-card-first and is reversed for the native back-of-vector draw convention)
 - the two wild cards as distinct native card IDs
+- signed 64-bit `randomSeed` text without routing it through JSON-double precision
+
+Unsupported active Java AI controller classes are rejected rather than silently substituted with a different strategy. Neutral's Java `PlayerAI` controller remains supported through the dedicated Neutral path.
 
 The standard-world Java card symbols map directly to the native deck because both use Infantry/Cavalry/Artillery by territory index modulo 3.
 
@@ -136,7 +161,6 @@ Java also stores `maneuverUsed` without its source/destination route. The native
 
 Remaining migration work is now concentrated in:
 
-- richer strategy-specific AI parity beyond the explicit Skynet target rule
 - historical, custom and procedural maps
 - old Java ObjectStream save/map conversion
 - replay/action log
