@@ -1,9 +1,11 @@
 #include "engine/GameEngine.hpp"
 
 #include <algorithm>
-#include <cmath>
+#include <cstddef>
+#include <functional>
 #include <queue>
 #include <stdexcept>
+#include <utility>
 
 namespace winrisk {
 namespace {
@@ -20,8 +22,8 @@ std::uint64_t rotateLeft(std::uint64_t value, int shift) {
 }
 
 void link(std::vector<Territory>& territories, int a, int b) {
-    territories[a].adjacent.push_back(b);
-    territories[b].adjacent.push_back(a);
+    territories[static_cast<std::size_t>(a)].adjacent.push_back(b);
+    territories[static_cast<std::size_t>(b)].adjacent.push_back(a);
 }
 
 std::vector<int> range(int first, int lastInclusive) {
@@ -95,7 +97,9 @@ const std::array<std::uint64_t, 4>& Random::state() const {
 }
 
 void Random::setState(const std::array<std::uint64_t, 4>& state) {
-    const bool allZero = std::all_of(state.begin(), state.end(), [](std::uint64_t value) { return value == 0; });
+    const bool allZero = std::all_of(state.begin(), state.end(), [](std::uint64_t value) {
+        return value == 0;
+    });
     state_ = allZero ? Random(1).state() : state;
 }
 
@@ -104,10 +108,13 @@ GameEngine::GameEngine()
 }
 
 bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode) {
+    const bool knownMode = mode == GameMode::Classic || mode == GameMode::SecretMission || mode == GameMode::Capital;
     const int minimumPlayers = mode == GameMode::Classic ? 2 : 3;
-    if (mode == GameMode::Capital || playerCount < minimumPlayers || playerCount > 5 || humanPlayers < 0 || humanPlayers > playerCount) {
+    if (!knownMode || playerCount < minimumPlayers || playerCount > 5
+        || humanPlayers < 0 || humanPlayers > playerCount) {
         return false;
     }
+
     territories_ = makeWorldTerritories();
     continents_ = makeWorldContinents();
     random_ = Random(seed);
@@ -121,14 +128,34 @@ bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t s
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
+
     setupPlayers(playerCount, humanPlayers);
+
     if (mode_ == GameMode::SecretMission) {
         assignMissions();
+        distributeTerritories();
+        placeStartingTroopsOfficial();
+        initializeDeck();
+        currentPlayer_ = rollHighestPlayer();
+    } else if (mode_ == GameMode::Capital) {
+        currentPlayer_ = rollHighestPlayer();
+        claimTerritories(currentPlayer_);
+        placeStartingTroopsOfficial();
+        assignHeadquarters();
+        initializeDeck();
+        removeHeadquartersFromDeck();
+    } else if (playerCount >= 3) {
+        currentPlayer_ = rollHighestPlayer();
+        claimTerritories(currentPlayer_);
+        placeStartingTroopsOfficial();
+        initializeDeck();
+    } else {
+        distributeTerritories();
+        placeStartingTroops();
+        initializeDeck();
+        currentPlayer_ = rollHighestPlayer();
     }
-    distributeTerritories();
-    placeStartingTroops();
-    initializeDeck();
-    currentPlayer_ = rollHighestPlayer();
+
     beginTurn();
     return true;
 }
@@ -142,11 +169,13 @@ void GameEngine::setupPlayers(int playerCount, int humanPlayers) {
         0xff9b59b6U
     };
     players_.clear();
-    players_.reserve(playerCount);
+    players_.reserve(static_cast<std::size_t>(playerCount));
     for (int i = 0; i < playerCount; ++i) {
         Player player;
         player.id = i;
-        player.name = i < humanPlayers ? "Player " + std::to_string(i + 1) : "AI " + std::to_string(i - humanPlayers + 1);
+        player.name = i < humanPlayers
+            ? "Player " + std::to_string(i + 1)
+            : "AI " + std::to_string(i - humanPlayers + 1);
         player.color = colors[static_cast<std::size_t>(i)];
         player.ai = i >= humanPlayers;
         players_.push_back(std::move(player));
@@ -236,7 +265,10 @@ void GameEngine::awardTurnCard() {
 }
 
 void GameEngine::transferCards(int fromPlayer, int toPlayer) {
-    if (fromPlayer < 0 || toPlayer < 0 || fromPlayer >= static_cast<int>(players_.size()) || toPlayer >= static_cast<int>(players_.size()) || fromPlayer == toPlayer) {
+    if (fromPlayer < 0 || toPlayer < 0
+        || fromPlayer >= static_cast<int>(players_.size())
+        || toPlayer >= static_cast<int>(players_.size())
+        || fromPlayer == toPlayer) {
         return;
     }
     auto& source = players_[static_cast<std::size_t>(fromPlayer)].cards;
@@ -264,11 +296,13 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
     if (phase_ != Phase::Attack || !canAttack(sourceId, targetId)) {
         return result;
     }
+
     auto& source = territories_[static_cast<std::size_t>(sourceId)];
     auto& target = territories_[static_cast<std::size_t>(targetId)];
     const int defendingPlayer = target.owner;
     const int attackCount = std::min(3, source.armies - 1);
     const int defenseCount = std::min(2, target.armies);
+
     result.legal = true;
     result.attackDice.reserve(static_cast<std::size_t>(attackCount));
     result.defenseDice.reserve(static_cast<std::size_t>(defenseCount));
@@ -280,6 +314,7 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
     }
     std::sort(result.attackDice.begin(), result.attackDice.end(), std::greater<>());
     std::sort(result.defenseDice.begin(), result.defenseDice.end(), std::greater<>());
+
     const int comparisons = std::min(attackCount, defenseCount);
     for (int i = 0; i < comparisons; ++i) {
         if (result.attackDice[static_cast<std::size_t>(i)] > result.defenseDice[static_cast<std::size_t>(i)]) {
@@ -288,6 +323,7 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
             ++result.attackerLosses;
         }
     }
+
     source.armies -= result.attackerLosses;
     target.armies -= result.defenderLosses;
     if (target.armies <= 0) {
@@ -302,6 +338,7 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
             tradeAfterElimination(currentPlayer_);
         }
     }
+
     if (defendingPlayer >= 0) {
         updateEliminationsAndWinner();
     }
@@ -371,6 +408,7 @@ int GameEngine::tradeCardsForPlayer(int playerId) {
     if (!set) {
         return 0;
     }
+
     std::array<int, 3> ids = {
         player.cards[(*set)[0]],
         player.cards[(*set)[1]],
@@ -386,6 +424,7 @@ int GameEngine::tradeCardsForPlayer(int playerId) {
             discard_.push_back(*card);
         }
     }
+
     const int bonus = tradeValue(tradeCount_);
     ++tradeCount_;
     player.reinforcements += bonus;
@@ -553,7 +592,11 @@ bool GameEngine::canAttack(int sourceId, int targetId) const {
     }
     const auto& source = territories_[static_cast<std::size_t>(sourceId)];
     const auto& target = territories_[static_cast<std::size_t>(targetId)];
-    return source.owner == currentPlayer_ && target.owner >= 0 && target.owner != currentPlayer_ && source.armies >= 2 && target.armies >= 1;
+    return source.owner == currentPlayer_
+        && target.owner >= 0
+        && target.owner != currentPlayer_
+        && source.armies >= 2
+        && target.armies >= 1;
 }
 
 bool GameEngine::canManeuver(int sourceId, int targetId) const {
@@ -562,7 +605,10 @@ bool GameEngine::canManeuver(int sourceId, int targetId) const {
     }
     const auto& source = territories_[static_cast<std::size_t>(sourceId)];
     const auto& target = territories_[static_cast<std::size_t>(targetId)];
-    return source.owner == currentPlayer_ && target.owner == currentPlayer_ && source.armies >= 2 && ownsConnectedPath(sourceId, targetId, currentPlayer_);
+    return source.owner == currentPlayer_
+        && target.owner == currentPlayer_
+        && source.armies >= 2
+        && ownsConnectedPath(sourceId, targetId, currentPlayer_);
 }
 
 bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) const {
@@ -580,7 +626,8 @@ bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) cons
             return true;
         }
         for (const int next : territories_[static_cast<std::size_t>(current)].adjacent) {
-            if (!visited[static_cast<std::size_t>(next)] && territories_[static_cast<std::size_t>(next)].owner == ownerId) {
+            if (!visited[static_cast<std::size_t>(next)]
+                && territories_[static_cast<std::size_t>(next)].owner == ownerId) {
                 visited[static_cast<std::size_t>(next)] = true;
                 pending.push(next);
             }
@@ -608,21 +655,35 @@ Snapshot GameEngine::snapshot() const {
 }
 
 bool GameEngine::restore(const Snapshot& snapshot) {
-    if ((snapshot.version < 2 || snapshot.version > 4) || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) {
+    if (snapshot.version < 2 || snapshot.version > 4
+        || snapshot.players.size() < 2 || snapshot.players.size() > 5
+        || snapshot.territories.size() != 42) {
         return false;
     }
+
     const GameMode restoredMode = snapshot.version >= 4 ? snapshot.mode : GameMode::Classic;
-    if (restoredMode == GameMode::Capital || (restoredMode == GameMode::SecretMission && snapshot.players.size() < 3)) {
+    if ((restoredMode == GameMode::SecretMission || restoredMode == GameMode::Capital)
+        && snapshot.players.size() < 3) {
+        return false;
+    }
+    if (restoredMode != GameMode::Classic
+        && restoredMode != GameMode::SecretMission
+        && restoredMode != GameMode::Capital) {
         return false;
     }
     if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size())) {
         return false;
     }
+
     for (const auto& territory : snapshot.territories) {
-        if (territory.id < 0 || territory.id >= 42 || territory.owner < -1 || territory.owner >= static_cast<int>(snapshot.players.size()) || territory.armies < 0) {
+        if (territory.id < 0 || territory.id >= 42
+            || territory.owner < -1 || territory.owner >= static_cast<int>(snapshot.players.size())
+            || territory.armies < 0) {
             return false;
         }
     }
+
+    std::array<bool, 42> headquarters{};
     for (const auto& player : snapshot.players) {
         for (const int cardId : player.cards) {
             if (findCard(cardId) == nullptr) {
@@ -633,10 +694,55 @@ bool GameEngine::restore(const Snapshot& snapshot) {
             return false;
         }
         if (player.mission && player.mission->kind == MissionKind::Elimination
-            && (player.mission->eliminationTarget < 0 || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size()))) {
+            && (player.mission->eliminationTarget < 0
+                || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size()))) {
             return false;
         }
+        if (restoredMode == GameMode::Capital) {
+            if (player.headquarters < 0 || player.headquarters >= 42
+                || headquarters[static_cast<std::size_t>(player.headquarters)]) {
+                return false;
+            }
+            headquarters[static_cast<std::size_t>(player.headquarters)] = true;
+        }
     }
+
+    if (snapshot.version >= 3) {
+        for (const auto& card : snapshot.deck) {
+            if (findCard(card.id) == nullptr) {
+                return false;
+            }
+        }
+        for (const auto& card : snapshot.discard) {
+            if (findCard(card.id) == nullptr) {
+                return false;
+            }
+        }
+    }
+
+    if (restoredMode == GameMode::Capital) {
+        const auto isHeadquartersCard = [&](int cardId) {
+            const Card* card = findCard(cardId);
+            return card != nullptr && card->territoryId >= 0
+                && headquarters[static_cast<std::size_t>(card->territoryId)];
+        };
+        for (const auto& player : snapshot.players) {
+            if (std::any_of(player.cards.begin(), player.cards.end(), isHeadquartersCard)) {
+                return false;
+            }
+        }
+        for (const auto& card : snapshot.deck) {
+            if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) {
+                return false;
+            }
+        }
+        for (const auto& card : snapshot.discard) {
+            if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) {
+                return false;
+            }
+        }
+    }
+
     mode_ = restoredMode;
     players_ = snapshot.players;
     territories_ = snapshot.territories;
@@ -648,6 +754,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     random_.setState(snapshot.rngState);
     tradeCount_ = std::max(0, snapshot.tradeCount);
     conqueredThisTurn_ = snapshot.conqueredThisTurn;
+
     if (snapshot.version >= 3) {
         deck_ = snapshot.deck;
         discard_ = snapshot.discard;
@@ -658,6 +765,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
         tradeCount_ = 0;
         conqueredThisTurn_ = false;
     }
+
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
@@ -702,6 +810,7 @@ void GameEngine::updateEliminationsAndWinner() {
         winner_ = -1;
         return;
     }
+
     int alive = 0;
     int candidate = -1;
     for (auto& player : players_) {
@@ -711,6 +820,7 @@ void GameEngine::updateEliminationsAndWinner() {
             candidate = player.id;
         }
     }
+
     if (mode_ == GameMode::SecretMission) {
         for (const auto& player : players_) {
             if (!player.eliminated && player.mission && missionCompleted(player.id, *player.mission)) {
@@ -722,6 +832,15 @@ void GameEngine::updateEliminationsAndWinner() {
         winner_ = -1;
         return;
     }
+
+    if (mode_ == GameMode::Capital) {
+        winner_ = capitalWinner();
+        if (winner_ >= 0) {
+            phase_ = Phase::Finished;
+        }
+        return;
+    }
+
     if (alive == 1) {
         winner_ = candidate;
         phase_ = Phase::Finished;
@@ -795,7 +914,10 @@ std::optional<std::pair<int, int>> GameEngine::chooseAiAttack() const {
             if (target.owner == currentPlayer_ || target.owner < 0) {
                 continue;
             }
-            const int score = source.armies - target.armies;
+            int score = source.armies - target.armies;
+            if (mode_ == GameMode::Capital && headquartersOwner(target.id) >= 0) {
+                score += 8;
+            }
             if (score > bestScore) {
                 bestScore = score;
                 result = std::make_pair(source.id, target.id);
@@ -865,6 +987,7 @@ std::vector<Territory> GameEngine::makeWorldTerritories() {
         {0.66f,0.21f},{0.73f,0.14f},{0.81f,0.10f},{0.91f,0.17f},{0.80f,0.21f},{0.82f,0.29f},{0.92f,0.32f},{0.65f,0.31f},{0.75f,0.36f},{0.61f,0.42f},{0.68f,0.43f},{0.76f,0.49f},
         {0.79f,0.62f},{0.89f,0.61f},{0.82f,0.74f},{0.91f,0.73f}
     }};
+
     std::vector<Territory> territories;
     territories.reserve(names.size());
     for (int i = 0; i < static_cast<int>(names.size()); ++i) {
@@ -881,6 +1004,7 @@ std::vector<Territory> GameEngine::makeWorldTerritories() {
         else territory.continent = 5;
         territories.push_back(std::move(territory));
     }
+
     const std::array<std::pair<int,int>, 83> edges = {{
         {0,1},{0,3},{0,29},{1,2},{1,3},{1,4},{2,4},{2,5},{2,13},{3,4},{3,6},{4,5},{4,6},{4,7},{5,7},{6,7},{6,8},{7,8},{8,9},
         {9,10},{9,11},{10,11},{10,12},{11,12},{11,20},
