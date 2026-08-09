@@ -98,6 +98,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_legacy_import_tests "${WINRISK_ROOT}/tests/legacy_java_import_tests.cpp")
     target_link_libraries(winrisk_legacy_import_tests PRIVATE winrisk_qt Qt6::Core)
     add_test(NAME winrisk_legacy_import_tests COMMAND winrisk_legacy_import_tests)
+
+    add_executable(winrisk_legacy_import_edge_tests "${WINRISK_ROOT}/tests/legacy_java_import_edge_tests.cpp")
+    target_link_libraries(winrisk_legacy_import_edge_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_legacy_import_edge_tests COMMAND winrisk_legacy_import_edge_tests)
 endif()
 
 install(TARGETS winrisk_app
