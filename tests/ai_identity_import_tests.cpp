@@ -1,0 +1,150 @@
+#include "qt/LegacyJavaImporter.hpp"
+
+#include <QCoreApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+
+#include <array>
+#include <iostream>
+
+using namespace winrisk;
+
+namespace {
+
+int failures = 0;
+
+void check(bool condition, const char* expression, int line) {
+    if (!condition) {
+        std::cerr << "FAIL line " << line << ": " << expression << '\n';
+        ++failures;
+    }
+}
+
+#define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
+
+QString symbolFor(int id) {
+    if (id >= 42) return "WILD";
+    switch (id % 3) {
+        case 0: return "INFANTRY";
+        case 1: return "CAVALRY";
+        default: return "ARTILLERY";
+    }
+}
+
+QJsonObject card(int id) {
+    QJsonObject object;
+    object.insert("fieldIndex", id < 42 ? id : -1);
+    object.insert("symbol", symbolFor(id));
+    return object;
+}
+
+}
+
+int main(int argc, char** argv) {
+    QCoreApplication app(argc, argv);
+
+    QJsonObject root;
+    QJsonObject map;
+    QJsonArray mapFields;
+    const auto world = GameEngine::makeWorldTerritories();
+    for (int i = 0; i < 42; ++i) {
+        QJsonObject field;
+        field.insert("fieldIndex", i);
+        field.insert("displayName", QString::fromStdString(world[static_cast<std::size_t>(i)].name));
+        field.insert("cardSymbol", symbolFor(i));
+        mapFields.push_back(field);
+    }
+    map.insert("fields", mapFields);
+    root.insert("map", map);
+
+    QJsonObject params;
+    params.insert("gameMode", "CLASSIC");
+    params.insert("humanPlayers", 0);
+    params.insert("aiPlayers", 5);
+    params.insert("randomSeed", -9223372036854770000.0);
+    root.insert("params", params);
+
+    static const std::array<const char*, 5> classes = {
+        "com.winrisk.game.ai.EasyAI",
+        "com.winrisk.game.ai.ContinentAI",
+        "com.winrisk.game.ai.BalancedAI",
+        "com.winrisk.game.ai.BorderGuardAI",
+        "com.winrisk.game.ai.RandomAI"
+    };
+    static const std::array<AiStrategy, 5> strategies = {
+        AiStrategy::Easy,
+        AiStrategy::Continent,
+        AiStrategy::Balanced,
+        AiStrategy::BorderGuard,
+        AiStrategy::Random
+    };
+
+    QJsonArray players;
+    for (int i = 0; i < 5; ++i) {
+        QJsonObject player;
+        player.insert("colorRgb", -16777216 + i * 1118481);
+        player.insert("neutral", false);
+        player.insert("reinforcements", 0);
+        player.insert("conqueredTerritoryThisTurn", false);
+        player.insert("headquartersIndex", -1);
+        player.insert("interfaceClass", classes[static_cast<std::size_t>(i)]);
+        player.insert("cards", QJsonArray{});
+        players.push_back(player);
+    }
+    root.insert("players", players);
+
+    QJsonArray owners;
+    QJsonArray armies;
+    for (int i = 0; i < 42; ++i) {
+        owners.push_back(i % 5);
+        armies.push_back(2);
+    }
+    root.insert("fieldOwner", owners);
+    root.insert("fieldArmy", armies);
+    root.insert("curPlayer", 0);
+    root.insert("phase", "ATTACK");
+    root.insert("commanderDieUsed", false);
+    root.insert("maneuverUsed", false);
+    root.insert("neutralPlayerIndex", -1);
+    root.insert("tradeCount", 0);
+
+    QJsonArray draw;
+    for (int id = 0; id < 44; ++id) draw.push_back(card(id));
+    root.insert("drawPile", draw);
+    root.insert("discardPile", QJsonArray{});
+
+    QByteArray raw = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    const QByteArray preciseSeed = "-9223372036854770000";
+    const int seedKey = raw.indexOf("\"randomSeed\":");
+    if (seedKey >= 0) {
+        const int start = seedKey + static_cast<int>(sizeof("\"randomSeed\":") - 1);
+        int end = start;
+        while (end < raw.size() && raw[end] != ',' && raw[end] != '}') ++end;
+        raw.replace(start, end - start, preciseSeed);
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument exactDocument = QJsonDocument::fromJson(raw, &parseError);
+    CHECK(parseError.error == QJsonParseError::NoError);
+
+    Snapshot snapshot;
+    QString error;
+    CHECK(winrisk::qt::importJavaGameSketch(exactDocument.object(), raw, snapshot, error));
+    CHECK(error.isEmpty());
+    CHECK(snapshot.players.size() == 5);
+    for (std::size_t i = 0; i < strategies.size(); ++i) {
+        CHECK(snapshot.players[i].ai);
+        CHECK(snapshot.players[i].aiStrategy == strategies[i]);
+        CHECK(snapshot.players[i].name.find(GameEngine::aiStrategyName(strategies[i])) != std::string::npos);
+    }
+
+    GameEngine engine;
+    CHECK(engine.restore(snapshot));
+    for (std::size_t i = 0; i < strategies.size(); ++i) {
+        CHECK(engine.players()[i].aiStrategy == strategies[i]);
+    }
+
+    if (failures != 0) std::cerr << failures << " AI identity checks failed\n";
+    return failures == 0 ? 0 : 1;
+}
