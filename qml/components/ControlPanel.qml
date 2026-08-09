@@ -32,10 +32,11 @@ Frame {
 
         Label {
             Layout.fillWidth: true
-            text: appController.modeText + "  •  "
+            text: appController.mapText + "  •  " + appController.modeText + "  •  "
                   + (appController.winnerText.length > 0 ? appController.winnerText : appController.phaseText)
             font.pixelSize: 18
             font.bold: true
+            wrapMode: Text.Wrap
         }
 
         Label {
