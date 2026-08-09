@@ -18,6 +18,7 @@ add_library(winrisk_engine STATIC
     "${WINRISK_ROOT}/src/engine/GameEngineCore.cpp"
     "${WINRISK_ROOT}/src/engine/WorldMap.cpp"
     "${WINRISK_ROOT}/src/engine/BuiltinMaps.cpp"
+    "${WINRISK_ROOT}/src/engine/ProceduralMap.cpp"
     "${WINRISK_ROOT}/src/engine/MissionRules.cpp"
     "${WINRISK_ROOT}/src/engine/CapitalRules.cpp"
     "${WINRISK_ROOT}/src/engine/TwoPlayerRules.cpp"
@@ -101,6 +102,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_builtin_map_tests "${WINRISK_ROOT}/tests/builtin_map_tests.cpp")
     target_link_libraries(winrisk_builtin_map_tests PRIVATE winrisk_engine)
     add_test(NAME winrisk_builtin_map_tests COMMAND winrisk_builtin_map_tests)
+
+    add_executable(winrisk_procedural_map_tests "${WINRISK_ROOT}/tests/procedural_map_tests.cpp")
+    target_link_libraries(winrisk_procedural_map_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_procedural_map_tests COMMAND winrisk_procedural_map_tests)
 
     add_executable(winrisk_fog_model_tests "${WINRISK_ROOT}/tests/fog_model_tests.cpp")
     target_link_libraries(winrisk_fog_model_tests PRIVATE winrisk_qt Qt6::Core)
