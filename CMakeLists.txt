@@ -14,6 +14,7 @@ qt_standard_project_setup(REQUIRES 6.10)
 
 add_library(winrisk_engine STATIC
     src/engine/GameEngine.cpp
+    src/engine/MissionRules.cpp
 )
 
 target_include_directories(winrisk_engine PUBLIC src)
