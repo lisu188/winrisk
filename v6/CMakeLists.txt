@@ -21,6 +21,7 @@ add_library(winrisk_engine STATIC
     "${WINRISK_ROOT}/src/engine/CapitalRules.cpp"
     "${WINRISK_ROOT}/src/engine/TwoPlayerRules.cpp"
     "${WINRISK_ROOT}/src/engine/CombatRules.cpp"
+    "${WINRISK_ROOT}/src/engine/AiIdentity.cpp"
 )
 
 target_include_directories(winrisk_engine PUBLIC "${WINRISK_ROOT}/src")
