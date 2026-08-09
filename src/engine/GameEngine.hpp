@@ -158,6 +158,7 @@ private:
     std::vector<Player> players_;
     std::vector<Card> deck_;
     std::vector<Card> discard_;
+    std::vector<int> aiContinentGoals_;
     Random random_;
     GameMode mode_ = GameMode::Classic;
     RulesOptions rules_;
@@ -201,8 +202,23 @@ private:
     bool ownsContinent(int playerId, const Continent& continent) const;
     bool validTerritory(int id) const;
     bool isAdjacent(int sourceId, int targetId) const;
-    int chooseAiReinforcementTarget() const;
-    std::optional<std::pair<int, int>> chooseAiAttack() const;
+
+    bool runAiReinforcePhase();
+    void runAiAttackPhase();
+    void runAiManeuverPhase();
+    std::vector<int> ownedTerritoryIds(int playerId) const;
+    std::vector<int> borderTerritoryIds(int playerId) const;
+    std::vector<int> enemyTerritoryIds(int sourceId) const;
+    std::vector<int> visibleTerritoryIds(int playerId) const;
+    int graphDistance(int sourceId, int targetId) const;
+    double fieldScale(int territoryId) const;
+    void sortByScale(std::vector<int>& territoryIds) const;
+    int strongestByScale(const std::vector<int>& territoryIds) const;
+    int weakestByScale(const std::vector<int>& territoryIds) const;
+    int continentGoalFor(int playerId);
+    double averageProximityToContinent(int territoryId, int continentId) const;
+    bool javaInteractivePlayer(int playerId) const;
+
     std::optional<std::array<std::size_t, 3>> findTradeSet(const Player& player) const;
     const Card* findCard(int cardId) const;
 };
