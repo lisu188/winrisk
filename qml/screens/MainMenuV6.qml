@@ -49,6 +49,21 @@ Item {
                     anchors.fill: parent
                     spacing: 14
 
+                    Label { text: "Map"; font.bold: true }
+                    ComboBox {
+                        id: mapChoice
+                        Layout.fillWidth: true
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            { text: "World", value: "world" },
+                            { text: "Pangaea (~250 Ma)", value: "pangaea" },
+                            { text: "Laurasia (~150 Ma)", value: "laurasia" },
+                            { text: "Gondwana (~420 Ma)", value: "gondwana" },
+                            { text: "Rodinia (~1 Ga)", value: "rodinia" }
+                        ]
+                    }
+
                     Label { text: "Game mode"; font.bold: true }
                     ComboBox {
                         id: gameMode
@@ -88,6 +103,14 @@ Item {
                         wrapMode: Text.Wrap
                     }
 
+                    Label {
+                        Layout.fillWidth: true
+                        visible: gameMode.currentIndex === 1 && mapChoice.currentValue !== "world"
+                        text: "Java parity note: historical boards keep the original mission deck. On smaller boards, some fixed 24/18/15-territory objectives can be impossible."
+                        color: "#d7b46a"
+                        wrapMode: Text.Wrap
+                    }
+
                     Label { text: "Optional rules"; font.bold: true }
 
                     GridLayout {
@@ -116,7 +139,7 @@ Item {
                     Label {
                         Layout.fillWidth: true
                         visible: skynet.checked
-                        text: "Skynet reproduces the Java rule: when an AI attack position has an adjacent human target, it targets a human instead of an AI or neutral player from that position."
+                        text: "Skynet preserves Java behavior: AI scale calculations double Java-interactive fields, and EasyAI prefers adjacent interactive targets. In two-player Classic, Java Neutral is also classified as interactive."
                         color: "#9aa7b4"
                         wrapMode: Text.Wrap
                     }
@@ -136,7 +159,8 @@ Item {
                             commanderDie.checked,
                             attackWithAll.checked,
                             fogOfWar.checked,
-                            skynet.checked
+                            skynet.checked,
+                            mapChoice.currentValue
                         )
                     }
 
