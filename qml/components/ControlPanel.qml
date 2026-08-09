@@ -38,6 +38,13 @@ Frame {
             font.bold: true
         }
 
+        Label {
+            Layout.fillWidth: true
+            text: appController.rulesText
+            color: "#9aa7b4"
+            wrapMode: Text.Wrap
+        }
+
         Frame {
             Layout.fillWidth: true
             visible: appController.missionText.length > 0
