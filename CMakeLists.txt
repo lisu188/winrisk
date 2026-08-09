@@ -32,18 +32,26 @@ target_include_directories(winrisk_qt PUBLIC src)
 target_link_libraries(winrisk_qt PUBLIC winrisk_engine Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
 
 qt_add_executable(winrisk_app
-    src/app/main.cpp
+    src/app/main_v6.cpp
 )
+
+set(V6_QML_FILES
+    qml/MainV6.qml
+    qml/screens/MainMenuV6.qml
+    qml/screens/GameScreenV6.qml
+    qml/components/BoardPaneV6.qml
+    qml/components/ControlPanel.qml
+)
+set_source_files_properties(qml/MainV6.qml PROPERTIES QT_RESOURCE_ALIAS "MainV6.qml")
+set_source_files_properties(qml/screens/MainMenuV6.qml PROPERTIES QT_RESOURCE_ALIAS "MainMenuV6.qml")
+set_source_files_properties(qml/screens/GameScreenV6.qml PROPERTIES QT_RESOURCE_ALIAS "GameScreenV6.qml")
+set_source_files_properties(qml/components/BoardPaneV6.qml PROPERTIES QT_RESOURCE_ALIAS "BoardPaneV6.qml")
+set_source_files_properties(qml/components/ControlPanel.qml PROPERTIES QT_RESOURCE_ALIAS "ControlPanel.qml")
 
 qt_add_qml_module(winrisk_app
     URI WinRisk
     VERSION 1.0
-    QML_FILES
-        qml/Main.qml
-        qml/screens/MainMenu.qml
-        qml/screens/GameScreen.qml
-        qml/components/BoardPane.qml
-        qml/components/ControlPanel.qml
+    QML_FILES ${V6_QML_FILES}
 )
 
 target_link_libraries(winrisk_app PRIVATE winrisk_qt Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
@@ -78,6 +86,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_engine_tests tests/engine_tests_v6.cpp)
     target_link_libraries(winrisk_engine_tests PRIVATE winrisk_engine)
     add_test(NAME winrisk_engine_tests COMMAND winrisk_engine_tests)
+
+    add_executable(winrisk_fog_model_tests tests/fog_model_tests.cpp)
+    target_link_libraries(winrisk_fog_model_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_fog_model_tests COMMAND winrisk_fog_model_tests)
 endif()
 
 install(TARGETS winrisk_app
