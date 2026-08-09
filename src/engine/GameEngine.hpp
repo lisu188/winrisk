@@ -12,6 +12,7 @@ enum class Phase { Reinforce = 0, Attack = 1, Maneuver = 2, Finished = 3 };
 enum class GameMode { Classic = 0, SecretMission = 1, Capital = 2 };
 enum class CardType { Infantry = 0, Cavalry = 1, Artillery = 2, Wild = 3 };
 enum class MissionKind { Territory = 0, FortifiedTerritory = 1, Continents = 2, Elimination = 3 };
+enum class AiStrategy { Easy = 0, Continent = 1, Balanced = 2, BorderGuard = 3, Random = 4 };
 
 struct MissionSpec {
     MissionKind kind = MissionKind::Territory;
@@ -51,6 +52,7 @@ struct Player {
     std::string name;
     std::uint32_t color = 0xff808080u;
     bool ai = false;
+    AiStrategy aiStrategy = AiStrategy::Easy;
     bool neutral = false;
     bool eliminated = false;
     int reinforcements = 0;
@@ -146,6 +148,7 @@ public:
     static std::vector<Card> makeRiskDeck();
     static std::vector<MissionSpec> makeMissionDeck(int playerCount);
     static std::string missionDescription(const MissionSpec& mission);
+    static std::string aiStrategyName(AiStrategy strategy);
     static int startingTroops(int playerCount);
     static int tradeValue(int completedTrades);
 
