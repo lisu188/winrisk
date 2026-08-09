@@ -9,18 +9,22 @@ The `qt-cpp` implementation already contains:
 - pure C++20 engine with no Qt dependency
 - standard 42-territory world topology and continent bonuses
 - deterministic xoshiro-family RNG with serialized state
-- 2–5 player setup
+- Classic mode for 2–5 players
+- Secret Mission mode for 3–5 players with the Java mission deck semantics
+- deterministic mission assignment excluding self-elimination objectives
+- territory, fortified-territory, continent and elimination mission victory checks
 - human and AI players
 - reinforcement phase
 - Risk dice combat, captures and elimination
 - connected-territory maneuver phase
 - deterministic 44-card Risk deck with Infantry, Cavalry, Artillery and Wild cards
-- card awards after conquest, elimination card transfer, progressive trade values and forced reinforcement-phase trades
+- card awards after conquest, elimination card transfer and Java-compatible wildcard sets
+- progressive card trade values, forced reinforcement trades and immediate elimination trades
 - asynchronous one-action-at-a-time AI turns, including card trading
 - Qt `QAbstractListModel` presentation layer
 - responsive Qt Quick desktop/tablet/phone UI
-- native quick-save/load using versioned JSON schema v3
-- migration of native schema-v2 saves to v3
+- native quick-save/load using versioned JSON schema v4
+- migration of native schema-v2/v3 saves to v4
 - import of current Java JSON saves for standard-map Classic games without neutral armies
 - CTest engine tests that run in Debug and Release builds
 - native CI targets for Windows, Linux, macOS, Android, iOS and WebAssembly
@@ -48,14 +52,19 @@ Run the generated `winrisk_app` executable from the configured build directory.
 
 ## Android build
 
-Configure with the Qt for Android toolchain and Android SDK/NDK paths, then build the generated `apk` target:
+Configure with the Qt for Android toolchain and Android SDK/NDK paths, build the native target, then package it with `androiddeployqt`:
 
 ```bash
 qt-cmake -S . -B build/android -GNinja \
+  -DCMAKE_BUILD_TYPE=Release \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
   -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
-cmake --build build/android --target apk
+cmake --build build/android --target winrisk_app
+"$QT_HOST_PATH/bin/androiddeployqt" \
+  --input "$PWD/build/android/android-winrisk_app-deployment-settings.json" \
+  --output "$PWD/build/android/android-build" \
+  --apk "$PWD/WinRisk-android-arm64.apk"
 ```
 
 The application is native Qt/C++; it does not need a WinRisk server or network connection.
@@ -72,26 +81,27 @@ Pure C++ GameEngine
 
 The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, card trading, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
 
+Game modes and mission rules are also pure C++ and are serialized as explicit value types rather than QML state.
+
 ## Persistence
 
-New saves use JSON schema version 3 and contain stable player/territory/card IDs, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
+New saves use JSON schema version 4 and contain the game mode, stable player/territory/card IDs, Secret Mission objectives, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
 
-Native schema-v2 saves remain loadable. They are upgraded by reconstructing the deterministic card system while preserving their stored gameplay RNG state.
+Native schema-v2 and schema-v3 saves remain loadable as Classic games. Schema-v2 saves reconstruct the deterministic card system while preserving their stored gameplay RNG state.
 
-The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Capital, Secret Mission, two-player neutral-army saves, historical/custom maps and remaining optional-rule state are deliberately rejected until those systems are migrated rather than silently loading them incorrectly. Java card hands are not yet imported from legacy saves.
+The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Java Capital/Secret Mission saves, two-player neutral-army saves, historical/custom maps and remaining optional-rule state are deliberately rejected until those formats are migrated rather than silently loading them incorrectly. Java card hands are not yet imported from legacy saves.
 
 ## Remaining Java parity work
 
 The C++ milestone is playable but does not yet cover every feature of the Java version. Remaining migration work includes:
 
-- Secret Mission mode
-- Capital mode
+- Capital mode and HQ victory rules
 - official two-player neutral-army setup
-- immediate attack-phase forced card trade after eliminating a player when required
+- exact interactive territory-claiming setup for 3–5 player Classic/Capital games
 - fog of war and remaining optional rules
 - historical and procedural maps
-- full Java save parity for modes, legacy cards and old Java ObjectStream saves
-- richer AI strategies
+- full Java save parity for Secret Mission/Capital, legacy cards and old Java ObjectStream saves
+- richer mission-aware and mode-aware AI strategies
 - replay/action log
 - production signing/store packaging for Android and iOS
 
