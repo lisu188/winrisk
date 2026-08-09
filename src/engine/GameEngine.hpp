@@ -15,6 +15,19 @@ enum class Phase {
     Finished = 3
 };
 
+enum class CardType {
+    Infantry = 0,
+    Cavalry = 1,
+    Artillery = 2,
+    Wild = 3
+};
+
+struct Card {
+    int id = -1;
+    CardType type = CardType::Infantry;
+    int territoryId = -1;
+};
+
 struct Territory {
     int id = -1;
     std::string name;
@@ -40,6 +53,7 @@ struct Player {
     bool ai = false;
     bool eliminated = false;
     int reinforcements = 0;
+    std::vector<int> cards;
 };
 
 struct BattleResult {
@@ -52,7 +66,7 @@ struct BattleResult {
 };
 
 struct Snapshot {
-    int version = 2;
+    int version = 3;
     Phase phase = Phase::Reinforce;
     int currentPlayer = 0;
     int winner = -1;
@@ -60,6 +74,10 @@ struct Snapshot {
     std::array<std::uint64_t, 4> rngState{};
     std::vector<Player> players;
     std::vector<Territory> territories;
+    std::vector<Card> deck;
+    std::vector<Card> discard;
+    int tradeCount = 0;
+    bool conqueredThisTurn = false;
 };
 
 class Random {
@@ -82,17 +100,24 @@ public:
     bool reinforce(int territoryId, int count = 1);
     BattleResult attack(int sourceId, int targetId);
     bool maneuver(int sourceId, int targetId, int troops = 1);
+    int tradeCards();
     bool endPhase();
     bool aiStep();
 
     const std::vector<Territory>& territories() const;
     const std::vector<Continent>& continents() const;
     const std::vector<Player>& players() const;
+    const std::vector<Card>& deck() const;
+    const std::vector<Card>& discard() const;
     const Player* currentPlayer() const;
     Phase phase() const;
     int currentPlayerId() const;
     int winnerId() const;
     std::uint64_t turn() const;
+    int tradeCount() const;
+    int nextTradeValue() const;
+    bool canTradeCards() const;
+    bool mustTradeCards() const;
     bool running() const;
 
     bool canAttack(int sourceId, int targetId) const;
@@ -104,17 +129,23 @@ public:
 
     static std::vector<Territory> makeWorldTerritories();
     static std::vector<Continent> makeWorldContinents();
+    static std::vector<Card> makeRiskDeck();
     static int startingTroops(int playerCount);
+    static int tradeValue(int completedTrades);
 
 private:
     std::vector<Territory> territories_;
     std::vector<Continent> continents_;
     std::vector<Player> players_;
+    std::vector<Card> deck_;
+    std::vector<Card> discard_;
     Random random_;
     Phase phase_ = Phase::Finished;
     int currentPlayer_ = 0;
     int winner_ = -1;
     std::uint64_t turn_ = 0;
+    int tradeCount_ = 0;
+    bool conqueredThisTurn_ = false;
     bool maneuverUsed_ = false;
     int maneuverSource_ = -1;
     int maneuverTarget_ = -1;
@@ -122,6 +153,11 @@ private:
     void setupPlayers(int playerCount, int humanPlayers);
     void distributeTerritories();
     void placeStartingTroops();
+    void initializeDeck();
+    void shuffleCards(std::vector<Card>& cards);
+    void recycleDiscard();
+    void awardTurnCard();
+    void transferCards(int fromPlayer, int toPlayer);
     void beginTurn();
     void advancePlayer();
     void updateEliminationsAndWinner();
@@ -132,8 +168,11 @@ private:
     bool isAdjacent(int sourceId, int targetId) const;
     int chooseAiReinforcementTarget() const;
     std::optional<std::pair<int, int>> chooseAiAttack() const;
+    std::optional<std::array<std::size_t, 3>> findTradeSet(const Player& player) const;
+    const Card* findCard(int cardId) const;
 };
 
 std::string phaseName(Phase phase);
+std::string cardTypeName(CardType type);
 
 }
