@@ -76,8 +76,12 @@ winrisk::RulesOptions jsonToRules(const QJsonObject& object) {
     return rules;
 }
 
-bool jsonToCardVector(const QJsonArray& array, std::vector<winrisk::Card>& cards, QString& error) {
-    const auto catalog = winrisk::GameEngine::makeRiskDeck();
+bool jsonToCardVector(
+    const QJsonArray& array,
+    const std::vector<winrisk::Card>& catalog,
+    std::vector<winrisk::Card>& cards,
+    QString& error
+) {
     cards.clear();
     cards.reserve(static_cast<std::size_t>(array.size()));
     for (const auto value : array) {
@@ -95,6 +99,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     QJsonObject root;
     root.insert("schema", "winrisk-save");
     root.insert("version", snapshot.version);
+    root.insert("mapId", QString::fromStdString(snapshot.mapId));
     root.insert("mode", static_cast<int>(snapshot.mode));
     root.insert("rules", rulesToJson(snapshot.rules));
     root.insert("phase", static_cast<int>(snapshot.phase));
@@ -147,19 +152,27 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     QJsonArray discard;
     for (const auto& card : snapshot.discard) discard.push_back(card.id);
     root.insert("discard", discard);
-    root.insert("mapId", "world");
     return root;
 }
 
 bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QString& error) {
     const int version = root.value("version").toInt();
-    if (version < 2 || version > 6 || root.value("mapId").toString("world") != "world") {
-        error = "Unsupported WinRisk save version or map";
+    if (version < 2 || version > 6) {
+        error = "Unsupported WinRisk save version";
         return false;
     }
 
     snapshot = {};
     snapshot.version = version;
+    const QString requestedMapId = root.value("mapId").toString("world");
+    const auto definition = winrisk::GameEngine::makeBuiltinMap(requestedMapId.toStdString());
+    if (!definition) {
+        error = "Unsupported WinRisk save map";
+        return false;
+    }
+    snapshot.mapId = definition->id;
+    const auto catalog = winrisk::GameEngine::makeRiskDeck(static_cast<int>(definition->territories.size()));
+
     if (version >= 4) {
         const int mode = root.value("mode").toInt(-1);
         if (mode < static_cast<int>(winrisk::GameMode::Classic)
@@ -237,7 +250,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         player.headquarters = object.value("headquarters").toInt(-1);
         for (const auto cardValue : object.value("cards").toArray()) {
             const int cardId = cardValue.toInt(-1);
-            if (cardId < 0 || cardId >= 44) {
+            if (cardId < 0 || cardId >= static_cast<int>(catalog.size())) {
                 error = "Invalid player card";
                 return false;
             }
@@ -251,27 +264,29 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         snapshot.players.push_back(std::move(player));
     }
 
-    snapshot.territories = winrisk::GameEngine::makeWorldTerritories();
+    snapshot.territories = definition->territories;
     const QJsonArray territories = root.value("territories").toArray();
     if (territories.size() != static_cast<qsizetype>(snapshot.territories.size())) {
-        error = "Save does not contain the standard 42-territory world map";
+        error = "Save territory count does not match its built-in map";
         return false;
     }
+    std::vector<bool> seen(snapshot.territories.size(), false);
     for (const auto value : territories) {
         const QJsonObject object = value.toObject();
         const int id = object.value("id").toInt(-1);
-        if (id < 0 || id >= static_cast<int>(snapshot.territories.size())) {
+        if (id < 0 || id >= static_cast<int>(snapshot.territories.size()) || seen[static_cast<std::size_t>(id)]) {
             error = "Invalid territory id";
             return false;
         }
+        seen[static_cast<std::size_t>(id)] = true;
         auto& territory = snapshot.territories[static_cast<std::size_t>(id)];
         territory.owner = object.value("owner").toInt(-1);
         territory.armies = object.value("armies").toInt();
     }
 
     if (version >= 3) {
-        if (!jsonToCardVector(root.value("deck").toArray(), snapshot.deck, error)
-            || !jsonToCardVector(root.value("discard").toArray(), snapshot.discard, error)) {
+        if (!jsonToCardVector(root.value("deck").toArray(), catalog, snapshot.deck, error)
+            || !jsonToCardVector(root.value("discard").toArray(), catalog, snapshot.discard, error)) {
             return false;
         }
     }
@@ -370,6 +385,11 @@ AppController::AppController(QObject* parent) : QObject(parent), boardModel_(thi
 }
 
 bool AppController::running() const { return !engine_.players().empty(); }
+QString AppController::mapId() const { return QString::fromStdString(engine_.mapId()); }
+QString AppController::mapText() const {
+    const auto definition = winrisk::GameEngine::makeBuiltinMap(engine_.mapId());
+    return definition ? QString::fromStdString(definition->displayName) : QString::fromStdString(engine_.mapId());
+}
 QString AppController::modeText() const { return QString::fromStdString(winrisk::modeName(engine_.mode())); }
 
 QString AppController::rulesText() const {
@@ -407,7 +427,7 @@ int AppController::cardCount() const { const auto* p = engine_.currentPlayer(); 
 QString AppController::cardsText() const {
     const auto* player = engine_.currentPlayer();
     if (player == nullptr || player->cards.empty()) return "No cards";
-    const auto catalog = winrisk::GameEngine::makeRiskDeck();
+    const auto catalog = winrisk::GameEngine::makeRiskDeck(static_cast<int>(engine_.territories().size()));
     std::array<int, 4> counts{};
     for (const int cardId : player->cards) {
         if (cardId >= 0 && cardId < static_cast<int>(catalog.size())) {
@@ -440,12 +460,19 @@ bool AppController::startNewGame(
     bool commanderDie,
     bool attackWithAll,
     bool fogOfWar,
-    bool skynet
+    bool skynet,
+    const QString& requestedMapId
 ) {
     aiTimer_.stop();
     if (gameMode < static_cast<int>(winrisk::GameMode::Classic)
         || gameMode > static_cast<int>(winrisk::GameMode::Capital)) {
         status_ = "Invalid game mode";
+        refresh();
+        return false;
+    }
+    const auto mapDefinition = winrisk::GameEngine::makeBuiltinMap(requestedMapId.toStdString());
+    if (!mapDefinition) {
+        status_ = "Unknown map";
         refresh();
         return false;
     }
@@ -461,7 +488,7 @@ bool AppController::startNewGame(
 
     const auto mode = static_cast<winrisk::GameMode>(gameMode);
     const auto seed = QRandomGenerator::global()->generate64();
-    if (!engine_.startNewGame(playerCount, humanPlayers, seed, mode, rules)) {
+    if (!engine_.startNewGame(playerCount, humanPlayers, seed, mode, rules, mapDefinition->id)) {
         status_ = mode == winrisk::GameMode::Classic
             ? "Classic requires 2-5 players"
             : QString("%1 requires 3-5 players").arg(QString::fromStdString(winrisk::modeName(mode)));
@@ -471,7 +498,7 @@ bool AppController::startNewGame(
 
     viewerPlayerId_ = -1;
     setSelected(-1);
-    status_ = QString("%1 game started").arg(modeText());
+    status_ = QString("%1 — %2 game started").arg(mapText(), modeText());
     refresh();
     scheduleAi();
     return true;
