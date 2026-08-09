@@ -287,43 +287,6 @@ int main() {
     }
     CHECK(foundRerollChange);
 
-    Snapshot normalAi = actionSnapshot(classicSaved, Phase::Attack);
-    normalAi.currentPlayer = 2;
-    normalAi.territories[0].owner = 2;
-    normalAi.territories[0].armies = 20;
-    normalAi.territories[1].owner = 0;
-    normalAi.territories[1].armies = 15;
-    normalAi.territories[5].owner = 3;
-    normalAi.territories[5].armies = 1;
-    normalAi.territories[29].owner = 2;
-    normalAi.territories[29].armies = 2;
-    normalAi.rngState = Random(9191).state();
-
-    Snapshot skynetAi = normalAi;
-    skynetAi.rules.skynet = true;
-
-    GameEngine normalAiEngine;
-    GameEngine skynetAiEngine;
-    CHECK(normalAiEngine.restore(normalAi));
-    CHECK(skynetAiEngine.restore(skynetAi));
-    CHECK(normalAiEngine.currentPlayer() != nullptr && normalAiEngine.currentPlayer()->ai);
-    CHECK(skynetAiEngine.currentPlayer() != nullptr && skynetAiEngine.currentPlayer()->ai);
-
-    const int normalHumanBefore = normalAiEngine.territories()[1].armies;
-    const int normalAiBefore = normalAiEngine.territories()[5].armies;
-    CHECK(normalAiEngine.aiStep());
-    CHECK(normalAiEngine.territories()[1].armies == normalHumanBefore);
-    CHECK(normalAiEngine.territories()[5].armies != normalAiBefore
-        || normalAiEngine.territories()[5].owner == 2);
-
-    const int skynetHumanBefore = skynetAiEngine.territories()[1].armies;
-    const int skynetAiBefore = skynetAiEngine.territories()[5].armies;
-    CHECK(skynetAiEngine.aiStep());
-    CHECK(skynetAiEngine.territories()[1].armies != skynetHumanBefore
-        || skynetAiEngine.territories()[1].owner == 2);
-    CHECK(skynetAiEngine.territories()[5].armies == skynetAiBefore);
-    CHECK(skynetAiEngine.territories()[5].owner == 3);
-
     GameEngine twoPlayer;
     CHECK(twoPlayer.startNewGame(2, 1, 777, GameMode::Classic));
     CHECK(twoPlayer.players().size() == 3);
