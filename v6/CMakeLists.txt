@@ -22,6 +22,7 @@ add_library(winrisk_engine STATIC
     "${WINRISK_ROOT}/src/engine/TwoPlayerRules.cpp"
     "${WINRISK_ROOT}/src/engine/CombatRules.cpp"
     "${WINRISK_ROOT}/src/engine/AiIdentity.cpp"
+    "${WINRISK_ROOT}/src/engine/AiStrategies.cpp"
 )
 
 target_include_directories(winrisk_engine PUBLIC "${WINRISK_ROOT}/src")
@@ -91,6 +92,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_engine_tests "${WINRISK_ROOT}/tests/engine_tests_v6.cpp")
     target_link_libraries(winrisk_engine_tests PRIVATE winrisk_engine)
     add_test(NAME winrisk_engine_tests COMMAND winrisk_engine_tests)
+
+    add_executable(winrisk_ai_strategy_tests "${WINRISK_ROOT}/tests/ai_strategy_tests.cpp")
+    target_link_libraries(winrisk_ai_strategy_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_ai_strategy_tests COMMAND winrisk_ai_strategy_tests)
 
     add_executable(winrisk_fog_model_tests "${WINRISK_ROOT}/tests/fog_model_tests.cpp")
     target_link_libraries(winrisk_fog_model_tests PRIVATE winrisk_qt Qt6::Core)
