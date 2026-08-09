@@ -24,12 +24,23 @@ Item {
         anchors.margins: 14
         transformOrigin: Item.Center
 
-        Text { x: parent.width * 0.12; y: parent.height * 0.08; text: "NORTH AMERICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
-        Text { x: parent.width * 0.24; y: parent.height * 0.82; text: "SOUTH AMERICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
-        Text { x: parent.width * 0.45; y: parent.height * 0.08; text: "EUROPE"; color: "#526879"; font.pixelSize: 12; font.bold: true }
-        Text { x: parent.width * 0.47; y: parent.height * 0.77; text: "AFRICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
-        Text { x: parent.width * 0.72; y: parent.height * 0.06; text: "ASIA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
-        Text { x: parent.width * 0.82; y: parent.height * 0.82; text: "AUSTRALIA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 8
+            visible: appController.mapId !== "world"
+            text: appController.mapText.toUpperCase()
+            color: "#526879"
+            font.pixelSize: 14
+            font.bold: true
+            font.letterSpacing: 2
+        }
+
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.12; y: parent.height * 0.08; text: "NORTH AMERICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.24; y: parent.height * 0.82; text: "SOUTH AMERICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.45; y: parent.height * 0.08; text: "EUROPE"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.47; y: parent.height * 0.77; text: "AFRICA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.72; y: parent.height * 0.06; text: "ASIA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
+        Text { visible: appController.mapId === "world"; x: parent.width * 0.82; y: parent.height * 0.82; text: "AUSTRALIA"; color: "#526879"; font.pixelSize: 12; font.bold: true }
 
         Repeater {
             model: appController.boardModel
