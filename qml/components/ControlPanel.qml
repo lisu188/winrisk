@@ -47,7 +47,7 @@ Frame {
                 anchors.fill: parent
                 spacing: 3
                 Label {
-                    text: "Mission"
+                    text: appController.modeText === "Secret Mission" ? "Mission" : "Objective"
                     font.bold: true
                     color: "#ffcf70"
                 }
