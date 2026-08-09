@@ -211,7 +211,7 @@ bool GameEngine::aiStep() {
     }
     if (phase_ == Phase::Attack) {
         runAiAttackPhase();
-        phase_ = Phase::Maneuver;
+        if (phase_ != Phase::Finished) phase_ = Phase::Maneuver;
         return true;
     }
     if (phase_ == Phase::Maneuver) {
