@@ -342,12 +342,32 @@ int GameEngine::chooseAiReinforcementTarget() const {
     return bestId;
 }
 std::optional<std::pair<int, int>> GameEngine::chooseAiAttack() const {
-    int bestScore = 1; std::optional<std::pair<int, int>> result;
+    int bestScore = 1;
+    std::optional<std::pair<int, int>> result;
     for (const auto& source : territories_) {
         if (source.owner != currentPlayer_ || source.armies < 2) continue;
+
+        bool hasAdjacentHuman = false;
+        if (rules_.skynet) {
+            for (const int targetId : source.adjacent) {
+                const auto& target = territories_[static_cast<std::size_t>(targetId)];
+                if (target.owner < 0 || target.owner == currentPlayer_ || target.owner >= static_cast<int>(players_.size())) continue;
+                const auto& targetPlayer = players_[static_cast<std::size_t>(target.owner)];
+                if (!targetPlayer.ai && !targetPlayer.neutral) {
+                    hasAdjacentHuman = true;
+                    break;
+                }
+            }
+        }
+
         for (const int targetId : source.adjacent) {
-            const auto& target = territories_[static_cast<std::size_t>(targetId)]; if (target.owner == currentPlayer_ || target.owner < 0) continue;
-            int score = source.armies - target.armies; if (mode_ == GameMode::Capital && headquartersOwner(target.id) >= 0) score += 8;
+            const auto& target = territories_[static_cast<std::size_t>(targetId)];
+            if (target.owner == currentPlayer_ || target.owner < 0 || target.owner >= static_cast<int>(players_.size())) continue;
+            const auto& targetPlayer = players_[static_cast<std::size_t>(target.owner)];
+            if (hasAdjacentHuman && (targetPlayer.ai || targetPlayer.neutral)) continue;
+
+            int score = source.armies - target.armies;
+            if (mode_ == GameMode::Capital && headquartersOwner(target.id) >= 0) score += 8;
             if (score > bestScore) { bestScore = score; result = std::make_pair(source.id, target.id); }
         }
     }
