@@ -14,6 +14,7 @@ qt_standard_project_setup(REQUIRES 6.10)
 
 add_library(winrisk_engine STATIC
     src/engine/GameEngine.cpp
+    src/engine/WorldMap.cpp
     src/engine/MissionRules.cpp
     src/engine/CapitalRules.cpp
     src/engine/TwoPlayerRules.cpp
