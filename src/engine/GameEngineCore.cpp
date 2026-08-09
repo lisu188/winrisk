@@ -265,7 +265,13 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     else if ((restoredMode == GameMode::SecretMission || restoredMode == GameMode::Capital) && snapshot.players.size() < 3) return false;
     if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size()) || snapshot.players[static_cast<std::size_t>(snapshot.currentPlayer)].neutral) return false;
     for (const auto& territory : snapshot.territories) if (territory.id < 0 || territory.id >= 42 || territory.owner < -1 || territory.owner >= static_cast<int>(snapshot.players.size()) || territory.armies < 0) return false;
-    if (snapshot.version >= 5 && snapshot.maneuverUsed && (snapshot.phase != Phase::Maneuver || snapshot.maneuverSource < 0 || snapshot.maneuverSource >= 42 || snapshot.maneuverTarget < 0 || snapshot.maneuverTarget >= 42 || snapshot.maneuverSource == snapshot.maneuverTarget)) return false;
+    if (snapshot.version >= 5 && snapshot.maneuverUsed) {
+        const bool consumed = snapshot.maneuverSource == -1 && snapshot.maneuverTarget == -1;
+        const bool route = snapshot.maneuverSource >= 0 && snapshot.maneuverSource < 42
+            && snapshot.maneuverTarget >= 0 && snapshot.maneuverTarget < 42
+            && snapshot.maneuverSource != snapshot.maneuverTarget;
+        if (snapshot.phase != Phase::Maneuver || (!consumed && !route)) return false;
+    }
 
     std::array<bool, 42> headquarters{};
     for (const auto& player : snapshot.players) {
@@ -297,7 +303,9 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     commanderDieUsed_ = rules_.commanderDie && snapshot.commanderDieUsed;
     if (snapshot.version >= 5) { maneuverUsed_ = snapshot.maneuverUsed; maneuverSource_ = snapshot.maneuverSource; maneuverTarget_ = snapshot.maneuverTarget; }
     else { maneuverUsed_ = false; maneuverSource_ = -1; maneuverTarget_ = -1; }
-    if (maneuverUsed_ && (territories_[static_cast<std::size_t>(maneuverSource_)].owner != currentPlayer_ || territories_[static_cast<std::size_t>(maneuverTarget_)].owner != currentPlayer_)) return false;
+    if (maneuverUsed_ && maneuverSource_ >= 0
+        && (territories_[static_cast<std::size_t>(maneuverSource_)].owner != currentPlayer_
+            || territories_[static_cast<std::size_t>(maneuverTarget_)].owner != currentPlayer_)) return false;
     if (snapshot.version >= 3) { deck_ = snapshot.deck; discard_ = snapshot.discard; }
     else { const auto savedRng = random_.state(); initializeDeck(); random_.setState(savedRng); tradeCount_ = 0; conqueredThisTurn_ = false; }
     updateEliminationsAndWinner();
