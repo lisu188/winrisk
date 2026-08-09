@@ -76,6 +76,7 @@ struct Player {
     int reinforcements = 0;
     std::vector<int> cards;
     std::optional<MissionSpec> mission;
+    int headquarters = -1;
 };
 
 struct BattleResult {
@@ -144,6 +145,9 @@ public:
     bool mustTradeCards() const;
     bool running() const;
     std::string missionText(int playerId) const;
+    int headquartersOwner(int territoryId) const;
+    int headquartersControlledBy(int playerId) const;
+    std::string capitalObjectiveText(int playerId) const;
 
     bool canAttack(int sourceId, int targetId) const;
     bool canManeuver(int sourceId, int targetId) const;
@@ -182,8 +186,12 @@ private:
     void assignMissions();
     int rollHighestPlayer();
     void distributeTerritories();
+    void claimTerritories(int startingPlayer);
     void placeStartingTroops();
+    void placeStartingTroopsOfficial();
+    void assignHeadquarters();
     void initializeDeck();
+    void removeHeadquartersFromDeck();
     void shuffleCards(std::vector<Card>& cards);
     void recycleDiscard();
     void awardTurnCard();
@@ -194,6 +202,7 @@ private:
     void advancePlayer();
     void updateEliminationsAndWinner();
     bool missionCompleted(int playerId, const MissionSpec& mission) const;
+    int capitalWinner() const;
     int reinforcementCount(int playerId) const;
     int territoryCount(int playerId) const;
     bool ownsContinent(int playerId, const Continent& continent) const;
