@@ -119,6 +119,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("name", QString::fromStdString(player.name));
         object.insert("color", QString::number(player.color, 16));
         object.insert("ai", player.ai);
+        object.insert("aiStrategy", static_cast<int>(player.aiStrategy));
         object.insert("neutral", player.neutral);
         object.insert("eliminated", player.eliminated);
         object.insert("reinforcements", player.reinforcements);
@@ -223,6 +224,13 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
             return false;
         }
         player.ai = object.value("ai").toBool();
+        const int strategy = object.value("aiStrategy").toInt(static_cast<int>(winrisk::AiStrategy::Easy));
+        if (strategy < static_cast<int>(winrisk::AiStrategy::Easy)
+            || strategy > static_cast<int>(winrisk::AiStrategy::Random)) {
+            error = "Invalid AI strategy";
+            return false;
+        }
+        player.aiStrategy = static_cast<winrisk::AiStrategy>(strategy);
         player.neutral = object.value("neutral").toBool();
         player.eliminated = object.value("eliminated").toBool();
         player.reinforcements = object.value("reinforcements").toInt();
