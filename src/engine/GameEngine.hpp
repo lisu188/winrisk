@@ -72,6 +72,7 @@ struct Player {
     std::string name;
     std::uint32_t color = 0xff808080u;
     bool ai = false;
+    bool neutral = false;
     bool eliminated = false;
     int reinforcements = 0;
     std::vector<int> cards;
@@ -183,12 +184,14 @@ private:
     int maneuverTarget_ = -1;
 
     void setupPlayers(int playerCount, int humanPlayers);
+    void addNeutralPlayer();
     void assignMissions();
     int rollHighestPlayer();
     void distributeTerritories();
     void claimTerritories(int startingPlayer);
     void placeStartingTroops();
     void placeStartingTroopsOfficial();
+    void placeTwoPlayerStartingTroops();
     void assignHeadquarters();
     void initializeDeck();
     void removeHeadquartersFromDeck();
