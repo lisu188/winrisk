@@ -117,6 +117,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_ai_identity_import_tests "${WINRISK_ROOT}/tests/ai_identity_import_tests.cpp")
     target_link_libraries(winrisk_ai_identity_import_tests PRIVATE winrisk_qt Qt6::Core)
     add_test(NAME winrisk_ai_identity_import_tests COMMAND winrisk_ai_identity_import_tests)
+
+    add_executable(winrisk_historical_java_import_tests "${WINRISK_ROOT}/tests/historical_java_import_tests.cpp")
+    target_link_libraries(winrisk_historical_java_import_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_historical_java_import_tests COMMAND winrisk_historical_java_import_tests)
 endif()
 
 install(TARGETS winrisk_app
