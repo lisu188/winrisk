@@ -1,47 +1,62 @@
 #include "engine/GameEngine.hpp"
 
 #include <algorithm>
-#include <cassert>
+#include <iostream>
 
 using namespace winrisk;
 
+namespace {
+
+int failures = 0;
+
+void check(bool condition, const char* expression, int line) {
+    if (!condition) {
+        std::cerr << "FAIL line " << line << ": " << expression << '\n';
+        ++failures;
+    }
+}
+
+#define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
+
+}
+
 int main() {
     const auto world = GameEngine::makeWorldTerritories();
-    assert(world.size() == 42);
-    assert(world[0].name == "Alaska");
-    assert(world[29].name == "Kamchatka");
-    assert(std::find(world[0].adjacent.begin(), world[0].adjacent.end(), 29) != world[0].adjacent.end());
+    CHECK(world.size() == 42);
+    CHECK(world[0].name == "Alaska");
+    CHECK(world[29].name == "Kamchatka");
+    CHECK(std::find(world[0].adjacent.begin(), world[0].adjacent.end(), 29) != world[0].adjacent.end());
 
     const auto cards = GameEngine::makeRiskDeck();
-    assert(cards.size() == 44);
-    assert(cards[0].type == CardType::Infantry);
-    assert(cards[1].type == CardType::Cavalry);
-    assert(cards[2].type == CardType::Artillery);
-    assert(cards[42].type == CardType::Wild);
-    assert(cards[43].type == CardType::Wild);
-    assert(GameEngine::tradeValue(0) == 4);
-    assert(GameEngine::tradeValue(5) == 15);
-    assert(GameEngine::tradeValue(6) == 20);
+    CHECK(cards.size() == 44);
+    CHECK(cards[0].type == CardType::Infantry);
+    CHECK(cards[1].type == CardType::Cavalry);
+    CHECK(cards[2].type == CardType::Artillery);
+    CHECK(cards[42].type == CardType::Wild);
+    CHECK(cards[43].type == CardType::Wild);
+    CHECK(GameEngine::tradeValue(0) == 4);
+    CHECK(GameEngine::tradeValue(5) == 15);
+    CHECK(GameEngine::tradeValue(6) == 20);
 
     GameEngine first;
     GameEngine second;
-    assert(first.startNewGame(4, 1, 4242));
-    assert(second.startNewGame(4, 1, 4242));
-    assert(first.currentPlayerId() == second.currentPlayerId());
-    assert(first.phase() == Phase::Reinforce);
-    assert(first.players().size() == 4);
-    assert(first.territories().size() == 42);
-    assert(first.deck().size() == 44);
-    assert(second.deck().size() == 44);
+    CHECK(first.startNewGame(4, 1, 4242));
+    CHECK(second.startNewGame(4, 1, 4242));
+    CHECK(first.currentPlayerId() == second.currentPlayerId());
+    CHECK(first.phase() == Phase::Reinforce);
+    CHECK(first.players().size() == 4);
+    CHECK(first.territories().size() == 42);
+    CHECK(first.deck().size() == 44);
+    CHECK(second.deck().size() == 44);
 
     for (std::size_t i = 0; i < first.territories().size(); ++i) {
-        assert(first.territories()[i].owner == second.territories()[i].owner);
-        assert(first.territories()[i].armies == second.territories()[i].armies);
-        assert(first.territories()[i].owner >= 0 && first.territories()[i].owner < 4);
-        assert(first.territories()[i].armies >= 1);
+        CHECK(first.territories()[i].owner == second.territories()[i].owner);
+        CHECK(first.territories()[i].armies == second.territories()[i].armies);
+        CHECK(first.territories()[i].owner >= 0 && first.territories()[i].owner < 4);
+        CHECK(first.territories()[i].armies >= 1);
     }
     for (std::size_t i = 0; i < first.deck().size(); ++i) {
-        assert(first.deck()[i].id == second.deck()[i].id);
+        CHECK(first.deck()[i].id == second.deck()[i].id);
     }
 
     for (int playerId = 0; playerId < 4; ++playerId) {
@@ -51,7 +66,7 @@ int main() {
                 armies += territory.armies;
             }
         }
-        assert(armies == GameEngine::startingTroops(4));
+        CHECK(armies == GameEngine::startingTroops(4));
     }
 
     const int current = first.currentPlayerId();
@@ -62,50 +77,61 @@ int main() {
             break;
         }
     }
-    assert(owned >= 0);
-    const int reinforcements = first.currentPlayer()->reinforcements;
-    assert(reinforcements >= 3);
-    assert(first.reinforce(owned, reinforcements));
-    assert(first.currentPlayer()->reinforcements == 0);
-    assert(first.endPhase());
-    assert(first.phase() == Phase::Attack);
-    assert(first.endPhase());
-    assert(first.phase() == Phase::Maneuver);
-    assert(first.endPhase());
-    assert(first.phase() == Phase::Reinforce);
-    assert(first.turn() == 2);
+    CHECK(owned >= 0);
+    const auto* currentPlayer = first.currentPlayer();
+    CHECK(currentPlayer != nullptr);
+    if (currentPlayer != nullptr) {
+        const int reinforcements = currentPlayer->reinforcements;
+        CHECK(reinforcements >= 3);
+        CHECK(first.reinforce(owned, reinforcements));
+        CHECK(first.currentPlayer()->reinforcements == 0);
+        CHECK(first.endPhase());
+        CHECK(first.phase() == Phase::Attack);
+        CHECK(first.endPhase());
+        CHECK(first.phase() == Phase::Maneuver);
+        CHECK(first.endPhase());
+        CHECK(first.phase() == Phase::Reinforce);
+        CHECK(first.turn() == 2);
+    }
 
     const Snapshot saved = first.snapshot();
-    assert(saved.version == 3);
+    CHECK(saved.version == 3);
     GameEngine restored;
-    assert(restored.restore(saved));
-    assert(restored.currentPlayerId() == first.currentPlayerId());
-    assert(restored.phase() == first.phase());
-    assert(restored.turn() == first.turn());
-    assert(restored.deck().size() == first.deck().size());
+    CHECK(restored.restore(saved));
+    CHECK(restored.currentPlayerId() == first.currentPlayerId());
+    CHECK(restored.phase() == first.phase());
+    CHECK(restored.turn() == first.turn());
+    CHECK(restored.deck().size() == first.deck().size());
     for (std::size_t i = 0; i < first.territories().size(); ++i) {
-        assert(restored.territories()[i].owner == first.territories()[i].owner);
-        assert(restored.territories()[i].armies == first.territories()[i].armies);
+        CHECK(restored.territories()[i].owner == first.territories()[i].owner);
+        CHECK(restored.territories()[i].armies == first.territories()[i].armies);
     }
 
     Snapshot tradeSnapshot = saved;
     const int trader = tradeSnapshot.currentPlayer;
-    tradeSnapshot.players[static_cast<std::size_t>(trader)].cards = {0, 3, 6};
-    tradeSnapshot.deck.erase(
-        std::remove_if(tradeSnapshot.deck.begin(), tradeSnapshot.deck.end(), [](const Card& card) {
-            return card.id == 0 || card.id == 3 || card.id == 6;
-        }),
-        tradeSnapshot.deck.end());
-    GameEngine trading;
-    assert(trading.restore(tradeSnapshot));
-    assert(trading.canTradeCards());
-    const int beforeTrade = trading.currentPlayer()->reinforcements;
-    assert(trading.tradeCards() == 4);
-    assert(trading.currentPlayer()->reinforcements == beforeTrade + 4);
-    assert(trading.currentPlayer()->cards.empty());
-    assert(trading.discard().size() == 3);
-    assert(trading.tradeCount() == 1);
-    assert(trading.nextTradeValue() == 6);
+    CHECK(trader >= 0 && trader < static_cast<int>(tradeSnapshot.players.size()));
+    if (trader >= 0 && trader < static_cast<int>(tradeSnapshot.players.size())) {
+        tradeSnapshot.players[static_cast<std::size_t>(trader)].cards = {0, 3, 6};
+        tradeSnapshot.deck.erase(
+            std::remove_if(tradeSnapshot.deck.begin(), tradeSnapshot.deck.end(), [](const Card& card) {
+                return card.id == 0 || card.id == 3 || card.id == 6;
+            }),
+            tradeSnapshot.deck.end());
+        GameEngine trading;
+        CHECK(trading.restore(tradeSnapshot));
+        CHECK(trading.canTradeCards());
+        const auto* tradingPlayer = trading.currentPlayer();
+        CHECK(tradingPlayer != nullptr);
+        if (tradingPlayer != nullptr) {
+            const int beforeTrade = tradingPlayer->reinforcements;
+            CHECK(trading.tradeCards() == 4);
+            CHECK(trading.currentPlayer()->reinforcements == beforeTrade + 4);
+            CHECK(trading.currentPlayer()->cards.empty());
+            CHECK(trading.discard().size() == 3);
+            CHECK(trading.tradeCount() == 1);
+            CHECK(trading.nextTradeValue() == 6);
+        }
+    }
 
     Snapshot legacyNative = saved;
     legacyNative.version = 2;
@@ -117,9 +143,12 @@ int main() {
         player.cards.clear();
     }
     GameEngine upgraded;
-    assert(upgraded.restore(legacyNative));
-    assert(upgraded.deck().size() == 44);
-    assert(upgraded.tradeCount() == 0);
+    CHECK(upgraded.restore(legacyNative));
+    CHECK(upgraded.deck().size() == 44);
+    CHECK(upgraded.tradeCount() == 0);
 
-    return 0;
+    if (failures != 0) {
+        std::cerr << failures << " test checks failed\n";
+    }
+    return failures == 0 ? 0 : 1;
 }
