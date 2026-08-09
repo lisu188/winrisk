@@ -47,6 +47,8 @@ private:
 class AppController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool running READ running NOTIFY stateChanged)
+    Q_PROPERTY(QString mapId READ mapId NOTIFY stateChanged)
+    Q_PROPERTY(QString mapText READ mapText NOTIFY stateChanged)
     Q_PROPERTY(QString modeText READ modeText NOTIFY stateChanged)
     Q_PROPERTY(QString rulesText READ rulesText NOTIFY stateChanged)
     Q_PROPERTY(QString phaseText READ phaseText NOTIFY stateChanged)
@@ -68,6 +70,8 @@ public:
     explicit AppController(QObject* parent = nullptr);
 
     bool running() const;
+    QString mapId() const;
+    QString mapText() const;
     QString modeText() const;
     QString rulesText() const;
     QString phaseText() const;
@@ -95,7 +99,8 @@ public:
         bool commanderDie,
         bool attackWithAll,
         bool fogOfWar,
-        bool skynet
+        bool skynet,
+        const QString& mapId
     );
     Q_INVOKABLE void territoryTapped(int territoryId);
     Q_INVOKABLE bool tradeCards();
