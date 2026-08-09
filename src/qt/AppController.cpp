@@ -28,6 +28,31 @@ QJsonArray intVectorToJson(const std::vector<int>& values) {
     return array;
 }
 
+QJsonObject missionToJson(const winrisk::MissionSpec& mission) {
+    QJsonObject object;
+    object.insert("kind", static_cast<int>(mission.kind));
+    object.insert("territories", mission.territories);
+    object.insert("minimumArmies", mission.minimumArmies);
+    object.insert("continentCount", mission.continentCount);
+    object.insert("eliminationTarget", mission.eliminationTarget);
+    return object;
+}
+
+bool jsonToMission(const QJsonObject& object, winrisk::MissionSpec& mission, QString& error) {
+    const int kind = object.value("kind").toInt(-1);
+    if (kind < static_cast<int>(winrisk::MissionKind::Territory)
+        || kind > static_cast<int>(winrisk::MissionKind::Elimination)) {
+        error = "Invalid mission kind";
+        return false;
+    }
+    mission.kind = static_cast<winrisk::MissionKind>(kind);
+    mission.territories = object.value("territories").toInt();
+    mission.minimumArmies = object.value("minimumArmies").toInt();
+    mission.continentCount = object.value("continentCount").toInt();
+    mission.eliminationTarget = object.value("eliminationTarget").toInt(-1);
+    return true;
+}
+
 bool jsonToCardVector(const QJsonArray& array, std::vector<winrisk::Card>& cards, QString& error) {
     const auto catalog = winrisk::GameEngine::makeRiskDeck();
     cards.clear();
@@ -47,6 +72,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     QJsonObject root;
     root.insert("schema", "winrisk-save");
     root.insert("version", snapshot.version);
+    root.insert("mode", static_cast<int>(snapshot.mode));
     root.insert("phase", static_cast<int>(snapshot.phase));
     root.insert("currentPlayer", snapshot.currentPlayer);
     root.insert("winner", snapshot.winner);
@@ -70,6 +96,9 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("eliminated", player.eliminated);
         object.insert("reinforcements", player.reinforcements);
         object.insert("cards", intVectorToJson(player.cards));
+        if (player.mission) {
+            object.insert("mission", missionToJson(*player.mission));
+        }
         players.push_back(object);
     }
     root.insert("players", players);
@@ -101,12 +130,23 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
 
 bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QString& error) {
     const int version = root.value("version").toInt();
-    if ((version != 2 && version != 3) || root.value("mapId").toString("world") != "world") {
+    if ((version < 2 || version > 4) || root.value("mapId").toString("world") != "world") {
         error = "Unsupported WinRisk save version or map";
         return false;
     }
     snapshot = {};
     snapshot.version = version;
+    if (version >= 4) {
+        const int mode = root.value("mode").toInt(-1);
+        if (mode < static_cast<int>(winrisk::GameMode::Classic)
+            || mode > static_cast<int>(winrisk::GameMode::Capital)) {
+            error = "Invalid game mode";
+            return false;
+        }
+        snapshot.mode = static_cast<winrisk::GameMode>(mode);
+    } else {
+        snapshot.mode = winrisk::GameMode::Classic;
+    }
     snapshot.phase = static_cast<winrisk::Phase>(root.value("phase").toInt());
     snapshot.currentPlayer = root.value("currentPlayer").toInt();
     snapshot.winner = root.value("winner").toInt(-1);
@@ -152,6 +192,13 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
             }
             player.cards.push_back(cardId);
         }
+        if (version >= 4 && object.contains("mission")) {
+            winrisk::MissionSpec mission;
+            if (!jsonToMission(object.value("mission").toObject(), mission, error)) {
+                return false;
+            }
+            player.mission = mission;
+        }
         snapshot.players.push_back(std::move(player));
     }
 
@@ -189,7 +236,7 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     }
     const QString mode = root.value("params").toObject().value("gameMode").toString("CLASSIC");
     if (mode != "CLASSIC") {
-        error = "Legacy CAPITAL and SECRET_MISSION saves require the remaining rules migration";
+        error = "Legacy CAPITAL and SECRET_MISSION saves are not imported yet";
         return false;
     }
 
@@ -197,6 +244,7 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     std::vector<int> oldToNew(static_cast<std::size_t>(oldPlayers.size()), -1);
     snapshot = {};
     snapshot.version = 2;
+    snapshot.mode = winrisk::GameMode::Classic;
     for (qsizetype i = 0; i < oldPlayers.size(); ++i) {
         const QJsonObject object = oldPlayers[i].toObject();
         if (object.value("neutral").toBool()) {
@@ -343,6 +391,10 @@ bool AppController::running() const {
     return !engine_.players().empty();
 }
 
+QString AppController::modeText() const {
+    return QString::fromStdString(winrisk::modeName(engine_.mode()));
+}
+
 QString AppController::phaseText() const {
     return QString::fromStdString(winrisk::phaseName(engine_.phase()));
 }
@@ -355,6 +407,17 @@ QString AppController::currentPlayerText() const {
 QColor AppController::currentPlayerColor() const {
     const auto* player = engine_.currentPlayer();
     return player == nullptr ? QColor("#808080") : QColor::fromRgba(player->color);
+}
+
+QString AppController::missionText() const {
+    const auto* player = engine_.currentPlayer();
+    if (player == nullptr || engine_.mode() != winrisk::GameMode::SecretMission) {
+        return {};
+    }
+    if (player->ai) {
+        return "AI mission hidden";
+    }
+    return QString::fromStdString(engine_.missionText(player->id));
 }
 
 int AppController::reinforcements() const {
@@ -415,16 +478,25 @@ BoardModel* AppController::boardModel() {
     return &boardModel_;
 }
 
-bool AppController::startNewGame(int playerCount, int humanPlayers) {
+bool AppController::startNewGame(int playerCount, int humanPlayers, int gameMode) {
     aiTimer_.stop();
+    if (gameMode < static_cast<int>(winrisk::GameMode::Classic)
+        || gameMode > static_cast<int>(winrisk::GameMode::SecretMission)) {
+        status_ = "That game mode is not available yet";
+        refresh();
+        return false;
+    }
+    const auto mode = static_cast<winrisk::GameMode>(gameMode);
     const auto seed = QRandomGenerator::global()->generate64();
-    if (!engine_.startNewGame(playerCount, humanPlayers, seed)) {
-        status_ = "Invalid player configuration";
+    if (!engine_.startNewGame(playerCount, humanPlayers, seed, mode)) {
+        status_ = mode == winrisk::GameMode::SecretMission
+            ? "Secret Mission requires 3-5 players"
+            : "Invalid player configuration";
         refresh();
         return false;
     }
     setSelected(-1);
-    status_ = "Game started";
+    status_ = QString("%1 game started").arg(modeText());
     refresh();
     scheduleAi();
     return true;
@@ -524,7 +596,9 @@ bool AppController::endPhase() {
         return false;
     }
     setSelected(-1);
-    status_ = QString("Phase: %1").arg(phaseText());
+    status_ = engine_.phase() == winrisk::Phase::Finished
+        ? winnerText()
+        : QString("Phase: %1").arg(phaseText());
     refresh();
     scheduleAi();
     return true;
@@ -551,7 +625,7 @@ bool AppController::quickLoad() {
         return false;
     }
     setSelected(-1);
-    status_ = snapshot.version == 2 ? "Game loaded and upgraded to save v3" : "Game loaded";
+    status_ = snapshot.version < 4 ? "Game loaded and upgraded to save v4" : "Game loaded";
     refresh();
     scheduleAi();
     return true;
@@ -589,7 +663,9 @@ void AppController::runAiStep() {
         return;
     }
     engine_.aiStep();
-    status_ = QString("%1 — %2").arg(currentPlayerText(), phaseText());
+    status_ = engine_.phase() == winrisk::Phase::Finished
+        ? winnerText()
+        : QString("%1 — %2").arg(currentPlayerText(), phaseText());
     refresh();
     scheduleAi();
 }
@@ -623,7 +699,7 @@ bool AppController::loadSnapshot(const QString& path, winrisk::Snapshot& snapsho
     }
     const QJsonObject root = document.object();
     const int version = root.value("version").toInt();
-    if (version == 2 || version == 3) {
+    if (version >= 2 && version <= 4) {
         return jsonToSnapshot(root, snapshot, error);
     }
     return legacyJavaJsonToSnapshot(root, raw, snapshot, error);
