@@ -158,6 +158,8 @@ private:
     void recycleDiscard();
     void awardTurnCard();
     void transferCards(int fromPlayer, int toPlayer);
+    int tradeCardsForPlayer(int playerId);
+    void tradeAfterElimination(int playerId);
     void beginTurn();
     void advancePlayer();
     void updateEliminationsAndWinner();
