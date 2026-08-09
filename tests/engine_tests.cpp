@@ -33,6 +33,11 @@ int main() {
     CHECK(world[0].name == "Alaska");
     CHECK(world[29].name == "Kamchatka");
     CHECK(std::find(world[0].adjacent.begin(), world[0].adjacent.end(), 29) != world[0].adjacent.end());
+    CHECK(std::find(world[21].adjacent.begin(), world[21].adjacent.end(), 22) != world[21].adjacent.end());
+    CHECK(std::find(world[30].adjacent.begin(), world[30].adjacent.end(), 31) != world[30].adjacent.end());
+    std::size_t adjacencyEntries = 0;
+    for (const auto& territory : world) adjacencyEntries += territory.adjacent.size();
+    CHECK(adjacencyEntries == 166);
 
     const auto cards = GameEngine::makeRiskDeck();
     CHECK(cards.size() == 44);
@@ -161,6 +166,86 @@ int main() {
     CHECK(upgradedV2.restore(legacyV2));
     CHECK(upgradedV2.mode() == GameMode::Classic);
     CHECK(upgradedV2.deck().size() == 44);
+
+    GameEngine twoA;
+    GameEngine twoB;
+    CHECK(twoA.startNewGame(2, 1, 777, GameMode::Classic));
+    CHECK(twoB.startNewGame(2, 1, 777, GameMode::Classic));
+    CHECK(twoA.players().size() == 3);
+    CHECK(twoA.currentPlayerId() == twoB.currentPlayerId());
+    int neutralId = -1;
+    int activePlayers = 0;
+    for (const auto& player : twoA.players()) {
+        if (player.neutral) {
+            neutralId = player.id;
+            CHECK(player.ai);
+            CHECK(player.eliminated);
+            CHECK(player.cards.empty());
+        } else {
+            ++activePlayers;
+        }
+    }
+    CHECK(activePlayers == 2);
+    CHECK(neutralId == 2);
+    CHECK(twoA.currentPlayerId() != neutralId);
+    CHECK(twoA.deck().size() == 44);
+    for (int playerId = 0; playerId < 3; ++playerId) {
+        int territories = 0;
+        int armies = 0;
+        for (const auto& territory : twoA.territories()) {
+            if (territory.owner == playerId) {
+                ++territories;
+                armies += territory.armies;
+            }
+        }
+        CHECK(territories == 14);
+        CHECK(armies == 40);
+    }
+    for (std::size_t i = 0; i < twoA.territories().size(); ++i) {
+        CHECK(twoA.territories()[i].owner == twoB.territories()[i].owner);
+        CHECK(twoA.territories()[i].armies == twoB.territories()[i].armies);
+    }
+
+    const Snapshot twoSaved = twoA.snapshot();
+    GameEngine twoRestored;
+    CHECK(twoRestored.restore(twoSaved));
+    CHECK(twoRestored.players().size() == 3);
+    CHECK(twoRestored.players()[static_cast<std::size_t>(neutralId)].neutral);
+    CHECK(twoRestored.players()[static_cast<std::size_t>(neutralId)].eliminated);
+    CHECK(twoRestored.currentPlayerId() != neutralId);
+
+    Snapshot twoTurn = twoSaved;
+    twoTurn.phase = Phase::Maneuver;
+    twoTurn.winner = -1;
+    twoTurn.currentPlayer = 0;
+    twoTurn.conqueredThisTurn = false;
+    GameEngine twoTurnEngine;
+    CHECK(twoTurnEngine.restore(twoTurn));
+    CHECK(twoTurnEngine.endPhase());
+    CHECK(twoTurnEngine.currentPlayerId() == 1);
+    CHECK(!twoTurnEngine.currentPlayer()->neutral);
+
+    Snapshot twoWinnerSnapshot = twoSaved;
+    twoWinnerSnapshot.phase = Phase::Attack;
+    twoWinnerSnapshot.winner = -1;
+    twoWinnerSnapshot.currentPlayer = 0;
+    for (auto& territory : twoWinnerSnapshot.territories) {
+        if (territory.owner == 1) territory.owner = neutralId;
+    }
+    GameEngine twoWinner;
+    CHECK(twoWinner.restore(twoWinnerSnapshot));
+    CHECK(twoWinner.winnerId() == 0);
+    CHECK(twoWinner.phase() == Phase::Finished);
+    int neutralTerritories = 0;
+    for (const auto& territory : twoWinner.territories()) {
+        if (territory.owner == neutralId) ++neutralTerritories;
+    }
+    CHECK(neutralTerritories > 0);
+
+    Snapshot invalidNeutral = twoSaved;
+    invalidNeutral.players[0].neutral = true;
+    GameEngine invalidNeutralEngine;
+    CHECK(!invalidNeutralEngine.restore(invalidNeutral));
 
     GameEngine secretA;
     GameEngine secretB;
