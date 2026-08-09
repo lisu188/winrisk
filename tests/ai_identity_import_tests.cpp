@@ -6,6 +6,7 @@
 #include <QJsonObject>
 
 #include <array>
+#include <cstdint>
 #include <iostream>
 
 using namespace winrisk;
@@ -139,11 +140,27 @@ int main(int argc, char** argv) {
         CHECK(snapshot.players[i].name.find(GameEngine::aiStrategyName(strategies[i])) != std::string::npos);
     }
 
+    const auto expectedSeed = static_cast<std::uint64_t>(static_cast<std::int64_t>(-9223372036854770000LL));
+    CHECK(snapshot.rngState == Random(expectedSeed).state());
+
     GameEngine engine;
     CHECK(engine.restore(snapshot));
     for (std::size_t i = 0; i < strategies.size(); ++i) {
         CHECK(engine.players()[i].aiStrategy == strategies[i]);
     }
+
+    QJsonObject unsupportedRoot = exactDocument.object();
+    QJsonArray unsupportedPlayers = unsupportedRoot.value("players").toArray();
+    QJsonObject unsupportedPlayer = unsupportedPlayers[0].toObject();
+    unsupportedPlayer.insert("interfaceClass", "com.winrisk.game.ai.UnknownAI");
+    unsupportedPlayers[0] = unsupportedPlayer;
+    unsupportedRoot.insert("players", unsupportedPlayers);
+    const QByteArray unsupportedRaw = QJsonDocument(unsupportedRoot).toJson(QJsonDocument::Compact);
+
+    Snapshot rejected;
+    error.clear();
+    CHECK(!winrisk::qt::importJavaGameSketch(unsupportedRoot, unsupportedRaw, rejected, error));
+    CHECK(error.contains("Unsupported Java AI class"));
 
     if (failures != 0) std::cerr << failures << " AI identity checks failed\n";
     return failures == 0 ? 0 : 1;
