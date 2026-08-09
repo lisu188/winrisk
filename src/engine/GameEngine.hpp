@@ -43,6 +43,14 @@ struct MissionSpec {
     int eliminationTarget = -1;
 };
 
+struct RulesOptions {
+    bool incrementalCardSetValues = false;
+    bool expandedManeuver = false;
+    bool attackCardReroll = false;
+    bool commanderDie = false;
+    bool attackWithAll = false;
+};
+
 struct Card {
     int id = -1;
     CardType type = CardType::Infantry;
@@ -90,8 +98,9 @@ struct BattleResult {
 };
 
 struct Snapshot {
-    int version = 4;
+    int version = 5;
     GameMode mode = GameMode::Classic;
+    RulesOptions rules;
     Phase phase = Phase::Reinforce;
     int currentPlayer = 0;
     int winner = -1;
@@ -103,6 +112,7 @@ struct Snapshot {
     std::vector<Card> discard;
     int tradeCount = 0;
     bool conqueredThisTurn = false;
+    bool commanderDieUsed = false;
 };
 
 class Random {
@@ -121,7 +131,13 @@ class GameEngine {
 public:
     GameEngine();
 
-    bool startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode = GameMode::Classic);
+    bool startNewGame(
+        int playerCount,
+        int humanPlayers,
+        std::uint64_t seed,
+        GameMode mode = GameMode::Classic,
+        RulesOptions rules = {}
+    );
     bool reinforce(int territoryId, int count = 1);
     BattleResult attack(int sourceId, int targetId);
     bool maneuver(int sourceId, int targetId, int troops = 1);
@@ -136,6 +152,8 @@ public:
     const std::vector<Card>& discard() const;
     const Player* currentPlayer() const;
     GameMode mode() const;
+    const RulesOptions& rules() const;
+    bool commanderDieUsed() const;
     Phase phase() const;
     int currentPlayerId() const;
     int winnerId() const;
@@ -173,12 +191,14 @@ private:
     std::vector<Card> discard_;
     Random random_;
     GameMode mode_ = GameMode::Classic;
+    RulesOptions rules_;
     Phase phase_ = Phase::Finished;
     int currentPlayer_ = 0;
     int winner_ = -1;
     std::uint64_t turn_ = 0;
     int tradeCount_ = 0;
     bool conqueredThisTurn_ = false;
+    bool commanderDieUsed_ = false;
     bool maneuverUsed_ = false;
     int maneuverSource_ = -1;
     int maneuverTarget_ = -1;
@@ -201,6 +221,7 @@ private:
     void transferCards(int fromPlayer, int toPlayer);
     int tradeCardsForPlayer(int playerId);
     void tradeAfterElimination(int playerId);
+    BattleResult resolveOneBattle(int sourceId, int targetId);
     void beginTurn();
     void advancePlayer();
     void updateEliminationsAndWinner();
