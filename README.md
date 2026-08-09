@@ -1,6 +1,6 @@
 # WinRisk
 
-WinRisk is being migrated to a single-process **C++20 + Qt 6.11 Qt Quick** application. The native client contains the game engine directly: there is no Spring Boot server, REST API, WebSocket transport, React frontend, browser, or WebView in the new runtime.
+WinRisk is being migrated to a single-process **C++20 + Qt 6 Qt Quick** application. The native client contains the game engine directly: there is no Spring Boot server, REST API, WebSocket transport, React frontend, browser, or WebView in the new runtime.
 
 ## Current Qt milestone
 
@@ -14,13 +14,16 @@ The `qt-cpp` implementation already contains:
 - reinforcement phase
 - Risk dice combat, captures and elimination
 - connected-territory maneuver phase
-- asynchronous one-action-at-a-time AI turns
+- deterministic 44-card Risk deck with Infantry, Cavalry, Artillery and Wild cards
+- card awards after conquest, elimination card transfer, progressive trade values and forced reinforcement-phase trades
+- asynchronous one-action-at-a-time AI turns, including card trading
 - Qt `QAbstractListModel` presentation layer
 - responsive Qt Quick desktop/tablet/phone UI
-- native quick-save/load using versioned JSON
+- native quick-save/load using versioned JSON schema v3
+- migration of native schema-v2 saves to v3
 - import of current Java JSON saves for standard-map Classic games without neutral armies
-- CTest engine tests
-- Android-compatible Qt CMake target
+- CTest engine tests that run in Debug and Release builds
+- native CI targets for Windows, Linux, macOS, Android, iOS and WebAssembly
 
 The legacy Java/Spring/React source is intentionally still present on this migration branch as a behavior and format reference. It is not linked into the C++ application and will be removed only after parity work is complete.
 
@@ -28,10 +31,10 @@ The legacy Java/Spring/React source is intentionally still present on this migra
 
 - CMake 3.24+
 - C++20 compiler
-- Qt 6.11.x with Core, Gui, Qml, Quick and QuickControls2
+- Qt 6.10+ with Core, Gui, Qml, Quick and QuickControls2
 - Ninja recommended
 
-Qt 6.11 supports Windows, macOS, Linux, Android, iOS and WebAssembly. Android builds should use the NDK version supported by the installed Qt package.
+Linux, macOS, Android, iOS and WebAssembly CI use Qt 6.11.1. Windows CI currently uses Qt 6.10.3 while the public Qt 6.11 Windows package tooling catches up; the application does not rely on 6.11-only APIs.
 
 ## Desktop build
 
@@ -67,27 +70,29 @@ AppController + BoardModel
 Pure C++ GameEngine
 ```
 
-The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
+The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, card trading, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
 
 ## Persistence
 
-New saves are versioned JSON and contain stable player/territory IDs plus the complete RNG state. They do not serialize C++ object layouts or pointers.
+New saves use JSON schema version 3 and contain stable player/territory/card IDs, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
 
-The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Capital, Secret Mission, two-player neutral-army saves, historical/custom maps, cards and remaining optional-rule state are deliberately rejected until those systems are migrated rather than silently loading them incorrectly.
+Native schema-v2 saves remain loadable. They are upgraded by reconstructing the deterministic card system while preserving their stored gameplay RNG state.
+
+The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Capital, Secret Mission, two-player neutral-army saves, historical/custom maps and remaining optional-rule state are deliberately rejected until those systems are migrated rather than silently loading them incorrectly. Java card hands are not yet imported from legacy saves.
 
 ## Remaining Java parity work
 
 The C++ milestone is playable but does not yet cover every feature of the Java version. Remaining migration work includes:
 
-- Risk cards and trade rules
 - Secret Mission mode
 - Capital mode
 - official two-player neutral-army setup
+- immediate attack-phase forced card trade after eliminating a player when required
 - fog of war and remaining optional rules
 - historical and procedural maps
-- full Java save parity for those systems
+- full Java save parity for modes, legacy cards and old Java ObjectStream saves
 - richer AI strategies
 - replay/action log
-- WebAssembly and iOS CI packaging
+- production signing/store packaging for Android and iOS
 
 Once those parity gates pass, the legacy Java, Spring Boot, React, Gradle and libGDX migration code can be deleted.
