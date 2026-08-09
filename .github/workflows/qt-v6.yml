@@ -11,6 +11,8 @@ on:
       - 'src/engine/**'
       - 'src/qt/AppControllerV6.cpp'
       - 'src/qt/AppController.hpp'
+      - 'src/qt/LegacyJavaImporter.cpp'
+      - 'src/qt/LegacyJavaImporter.hpp'
       - 'src/app/main_v6.cpp'
       - 'qml/MainV6.qml'
       - 'qml/screens/MainMenuV6.qml'
@@ -19,6 +21,7 @@ on:
       - 'qml/components/ControlPanel.qml'
       - 'tests/engine_tests_v6.cpp'
       - 'tests/fog_model_tests.cpp'
+      - 'tests/legacy_java_import_tests.cpp'
       - 'platform/android/**'
       - '.github/workflows/qt-v6.yml'
   pull_request:
@@ -30,6 +33,8 @@ on:
       - 'src/engine/**'
       - 'src/qt/AppControllerV6.cpp'
       - 'src/qt/AppController.hpp'
+      - 'src/qt/LegacyJavaImporter.cpp'
+      - 'src/qt/LegacyJavaImporter.hpp'
       - 'src/app/main_v6.cpp'
       - 'qml/MainV6.qml'
       - 'qml/screens/MainMenuV6.qml'
@@ -38,6 +43,7 @@ on:
       - 'qml/components/ControlPanel.qml'
       - 'tests/engine_tests_v6.cpp'
       - 'tests/fog_model_tests.cpp'
+      - 'tests/legacy_java_import_tests.cpp'
       - 'platform/android/**'
       - '.github/workflows/qt-v6.yml'
   workflow_dispatch:
