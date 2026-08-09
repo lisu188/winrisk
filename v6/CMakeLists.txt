@@ -89,6 +89,10 @@ if(BUILD_TESTING)
     add_executable(winrisk_engine_tests "${WINRISK_ROOT}/tests/engine_tests_v6.cpp")
     target_link_libraries(winrisk_engine_tests PRIVATE winrisk_engine)
     add_test(NAME winrisk_engine_tests COMMAND winrisk_engine_tests)
+
+    add_executable(winrisk_fog_model_tests "${WINRISK_ROOT}/tests/fog_model_tests.cpp")
+    target_link_libraries(winrisk_fog_model_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_fog_model_tests COMMAND winrisk_fog_model_tests)
 endif()
 
 install(TARGETS winrisk_app
