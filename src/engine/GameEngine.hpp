@@ -8,32 +8,10 @@
 
 namespace winrisk {
 
-enum class Phase {
-    Reinforce = 0,
-    Attack = 1,
-    Maneuver = 2,
-    Finished = 3
-};
-
-enum class GameMode {
-    Classic = 0,
-    SecretMission = 1,
-    Capital = 2
-};
-
-enum class CardType {
-    Infantry = 0,
-    Cavalry = 1,
-    Artillery = 2,
-    Wild = 3
-};
-
-enum class MissionKind {
-    Territory = 0,
-    FortifiedTerritory = 1,
-    Continents = 2,
-    Elimination = 3
-};
+enum class Phase { Reinforce = 0, Attack = 1, Maneuver = 2, Finished = 3 };
+enum class GameMode { Classic = 0, SecretMission = 1, Capital = 2 };
+enum class CardType { Infantry = 0, Cavalry = 1, Artillery = 2, Wild = 3 };
+enum class MissionKind { Territory = 0, FortifiedTerritory = 1, Continents = 2, Elimination = 3 };
 
 struct MissionSpec {
     MissionKind kind = MissionKind::Territory;
@@ -51,11 +29,7 @@ struct RulesOptions {
     bool attackWithAll = false;
 };
 
-struct Card {
-    int id = -1;
-    CardType type = CardType::Infantry;
-    int territoryId = -1;
-};
+struct Card { int id = -1; CardType type = CardType::Infantry; int territoryId = -1; };
 
 struct Territory {
     int id = -1;
@@ -68,12 +42,7 @@ struct Territory {
     int armies = 0;
 };
 
-struct Continent {
-    int id = -1;
-    std::string name;
-    int bonus = 0;
-    std::vector<int> territories;
-};
+struct Continent { int id = -1; std::string name; int bonus = 0; std::vector<int> territories; };
 
 struct Player {
     int id = -1;
@@ -113,6 +82,9 @@ struct Snapshot {
     int tradeCount = 0;
     bool conqueredThisTurn = false;
     bool commanderDieUsed = false;
+    bool maneuverUsed = false;
+    int maneuverSource = -1;
+    int maneuverTarget = -1;
 };
 
 class Random {
@@ -122,7 +94,6 @@ public:
     int uniform(int upperExclusive);
     const std::array<std::uint64_t, 4>& state() const;
     void setState(const std::array<std::uint64_t, 4>& state);
-
 private:
     std::array<std::uint64_t, 4> state_{};
 };
@@ -130,14 +101,7 @@ private:
 class GameEngine {
 public:
     GameEngine();
-
-    bool startNewGame(
-        int playerCount,
-        int humanPlayers,
-        std::uint64_t seed,
-        GameMode mode = GameMode::Classic,
-        RulesOptions rules = {}
-    );
+    bool startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode = GameMode::Classic, RulesOptions rules = {});
     bool reinforce(int territoryId, int count = 1);
     BattleResult attack(int sourceId, int targetId);
     bool maneuver(int sourceId, int targetId, int troops = 1);
