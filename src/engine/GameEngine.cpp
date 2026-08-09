@@ -32,6 +32,20 @@ std::vector<int> range(int first, int lastInclusive) {
     return result;
 }
 
+bool validTradeTypes(const std::array<int, 4>& counts) {
+    const int wild = counts[static_cast<std::size_t>(CardType::Wild)];
+    if (wild == 3) {
+        return true;
+    }
+    for (int type = 0; type < 3; ++type) {
+        if (counts[static_cast<std::size_t>(type)] + wild == 3) {
+            return true;
+        }
+    }
+    const int nonWild = counts[0] + counts[1] + counts[2];
+    return counts[0] <= 1 && counts[1] <= 1 && counts[2] <= 1 && nonWild + wild == 3;
+}
+
 }
 
 Random::Random(std::uint64_t seed) {
@@ -93,12 +107,15 @@ bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t s
     currentPlayer_ = 0;
     winner_ = -1;
     turn_ = 1;
+    tradeCount_ = 0;
+    conqueredThisTurn_ = false;
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
     setupPlayers(playerCount, humanPlayers);
     distributeTerritories();
     placeStartingTroops();
+    initializeDeck();
     currentPlayer_ = random_.uniform(playerCount);
     beginTurn();
     return true;
@@ -171,6 +188,51 @@ void GameEngine::placeStartingTroops() {
     }
 }
 
+void GameEngine::initializeDeck() {
+    deck_ = makeRiskDeck();
+    discard_.clear();
+    shuffleCards(deck_);
+}
+
+void GameEngine::shuffleCards(std::vector<Card>& cards) {
+    for (std::size_t i = cards.size(); i > 1; --i) {
+        const auto j = static_cast<std::size_t>(random_.uniform(static_cast<int>(i)));
+        std::swap(cards[i - 1], cards[j]);
+    }
+}
+
+void GameEngine::recycleDiscard() {
+    if (!deck_.empty() || discard_.empty()) {
+        return;
+    }
+    deck_ = std::move(discard_);
+    discard_.clear();
+    shuffleCards(deck_);
+}
+
+void GameEngine::awardTurnCard() {
+    if (!conqueredThisTurn_ || currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size())) {
+        conqueredThisTurn_ = false;
+        return;
+    }
+    recycleDiscard();
+    if (!deck_.empty()) {
+        players_[static_cast<std::size_t>(currentPlayer_)].cards.push_back(deck_.back().id);
+        deck_.pop_back();
+    }
+    conqueredThisTurn_ = false;
+}
+
+void GameEngine::transferCards(int fromPlayer, int toPlayer) {
+    if (fromPlayer < 0 || toPlayer < 0 || fromPlayer >= static_cast<int>(players_.size()) || toPlayer >= static_cast<int>(players_.size()) || fromPlayer == toPlayer) {
+        return;
+    }
+    auto& source = players_[static_cast<std::size_t>(fromPlayer)].cards;
+    auto& target = players_[static_cast<std::size_t>(toPlayer)].cards;
+    target.insert(target.end(), source.begin(), source.end());
+    source.clear();
+}
+
 bool GameEngine::reinforce(int territoryId, int count) {
     if (phase_ != Phase::Reinforce || count <= 0 || !validTerritory(territoryId)) {
         return false;
@@ -222,6 +284,10 @@ BattleResult GameEngine::attack(int sourceId, int targetId) {
         target.armies = occupation;
         source.armies -= occupation;
         result.captured = true;
+        conqueredThisTurn_ = true;
+        if (defendingPlayer >= 0 && territoryCount(defendingPlayer) == 0) {
+            transferCards(defendingPlayer, currentPlayer_);
+        }
     }
     if (defendingPlayer >= 0) {
         updateEliminationsAndWinner();
@@ -249,12 +315,86 @@ bool GameEngine::maneuver(int sourceId, int targetId, int troops) {
     return true;
 }
 
+std::optional<std::array<std::size_t, 3>> GameEngine::findTradeSet(const Player& player) const {
+    if (player.cards.size() < 3) {
+        return std::nullopt;
+    }
+    for (std::size_t a = 0; a + 2 < player.cards.size(); ++a) {
+        for (std::size_t b = a + 1; b + 1 < player.cards.size(); ++b) {
+            for (std::size_t c = b + 1; c < player.cards.size(); ++c) {
+                const Card* first = findCard(player.cards[a]);
+                const Card* second = findCard(player.cards[b]);
+                const Card* third = findCard(player.cards[c]);
+                if (first == nullptr || second == nullptr || third == nullptr) {
+                    continue;
+                }
+                std::array<int, 4> counts{};
+                ++counts[static_cast<std::size_t>(first->type)];
+                ++counts[static_cast<std::size_t>(second->type)];
+                ++counts[static_cast<std::size_t>(third->type)];
+                if (validTradeTypes(counts)) {
+                    return std::array<std::size_t, 3>{a, b, c};
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+const Card* GameEngine::findCard(int cardId) const {
+    static const std::vector<Card> catalog = makeRiskDeck();
+    if (cardId < 0 || cardId >= static_cast<int>(catalog.size())) {
+        return nullptr;
+    }
+    return &catalog[static_cast<std::size_t>(cardId)];
+}
+
+int GameEngine::tradeCards() {
+    if (phase_ != Phase::Reinforce || currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size())) {
+        return 0;
+    }
+    auto& player = players_[static_cast<std::size_t>(currentPlayer_)];
+    const auto set = findTradeSet(player);
+    if (!set) {
+        return 0;
+    }
+    std::array<int, 3> ids = {
+        player.cards[(*set)[0]],
+        player.cards[(*set)[1]],
+        player.cards[(*set)[2]]
+    };
+    std::array<std::size_t, 3> positions = *set;
+    std::sort(positions.begin(), positions.end(), std::greater<>());
+    for (const std::size_t position : positions) {
+        player.cards.erase(player.cards.begin() + static_cast<std::ptrdiff_t>(position));
+    }
+    for (const int id : ids) {
+        if (const Card* card = findCard(id)) {
+            discard_.push_back(*card);
+        }
+    }
+    const int bonus = tradeValue(tradeCount_);
+    ++tradeCount_;
+    player.reinforcements += bonus;
+    for (const int id : ids) {
+        const Card* card = findCard(id);
+        if (card != nullptr && card->territoryId >= 0 && validTerritory(card->territoryId)) {
+            auto& territory = territories_[static_cast<std::size_t>(card->territoryId)];
+            if (territory.owner == currentPlayer_) {
+                territory.armies += 2;
+                break;
+            }
+        }
+    }
+    return bonus;
+}
+
 bool GameEngine::endPhase() {
     if (!running()) {
         return false;
     }
     if (phase_ == Phase::Reinforce) {
-        if (players_[static_cast<std::size_t>(currentPlayer_)].reinforcements > 0) {
+        if (players_[static_cast<std::size_t>(currentPlayer_)].reinforcements > 0 || mustTradeCards()) {
             return false;
         }
         phase_ = Phase::Attack;
@@ -265,6 +405,7 @@ bool GameEngine::endPhase() {
         return true;
     }
     if (phase_ == Phase::Maneuver) {
+        awardTurnCard();
         advancePlayer();
         return true;
     }
@@ -279,6 +420,9 @@ bool GameEngine::aiStep() {
         return false;
     }
     if (phase_ == Phase::Reinforce) {
+        if (canTradeCards()) {
+            return tradeCards() > 0;
+        }
         auto& player = players_[static_cast<std::size_t>(currentPlayer_)];
         if (player.reinforcements > 0) {
             return reinforce(chooseAiReinforcementTarget(), 1);
@@ -311,6 +455,14 @@ const std::vector<Player>& GameEngine::players() const {
     return players_;
 }
 
+const std::vector<Card>& GameEngine::deck() const {
+    return deck_;
+}
+
+const std::vector<Card>& GameEngine::discard() const {
+    return discard_;
+}
+
 const Player* GameEngine::currentPlayer() const {
     if (currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size())) {
         return nullptr;
@@ -332,6 +484,24 @@ int GameEngine::winnerId() const {
 
 std::uint64_t GameEngine::turn() const {
     return turn_;
+}
+
+int GameEngine::tradeCount() const {
+    return tradeCount_;
+}
+
+int GameEngine::nextTradeValue() const {
+    return tradeValue(tradeCount_);
+}
+
+bool GameEngine::canTradeCards() const {
+    const auto* player = currentPlayer();
+    return player != nullptr && findTradeSet(*player).has_value();
+}
+
+bool GameEngine::mustTradeCards() const {
+    const auto* player = currentPlayer();
+    return player != nullptr && player->cards.size() >= 5 && canTradeCards();
 }
 
 bool GameEngine::running() const {
@@ -382,6 +552,7 @@ bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) cons
 
 Snapshot GameEngine::snapshot() const {
     Snapshot result;
+    result.version = 3;
     result.phase = phase_;
     result.currentPlayer = currentPlayer_;
     result.winner = winner_;
@@ -389,16 +560,30 @@ Snapshot GameEngine::snapshot() const {
     result.rngState = random_.state();
     result.players = players_;
     result.territories = territories_;
+    result.deck = deck_;
+    result.discard = discard_;
+    result.tradeCount = tradeCount_;
+    result.conqueredThisTurn = conqueredThisTurn_;
     return result;
 }
 
 bool GameEngine::restore(const Snapshot& snapshot) {
-    if (snapshot.version != 2 || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) {
+    if ((snapshot.version != 2 && snapshot.version != 3) || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) {
+        return false;
+    }
+    if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size())) {
         return false;
     }
     for (const auto& territory : snapshot.territories) {
         if (territory.id < 0 || territory.id >= 42 || territory.owner < -1 || territory.owner >= static_cast<int>(snapshot.players.size()) || territory.armies < 0) {
             return false;
+        }
+    }
+    for (const auto& player : snapshot.players) {
+        for (const int cardId : player.cards) {
+            if (findCard(cardId) == nullptr) {
+                return false;
+            }
         }
     }
     players_ = snapshot.players;
@@ -409,6 +594,18 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     winner_ = snapshot.winner;
     turn_ = snapshot.turn;
     random_.setState(snapshot.rngState);
+    tradeCount_ = std::max(0, snapshot.tradeCount);
+    conqueredThisTurn_ = snapshot.conqueredThisTurn;
+    if (snapshot.version >= 3) {
+        deck_ = snapshot.deck;
+        discard_ = snapshot.discard;
+    } else {
+        const auto savedRng = random_.state();
+        initializeDeck();
+        random_.setState(savedRng);
+        tradeCount_ = 0;
+        conqueredThisTurn_ = false;
+    }
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
@@ -423,6 +620,7 @@ void GameEngine::beginTurn() {
         return;
     }
     phase_ = Phase::Reinforce;
+    conqueredThisTurn_ = false;
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
@@ -554,6 +752,28 @@ int GameEngine::startingTroops(int playerCount) {
     }
 }
 
+int GameEngine::tradeValue(int completedTrades) {
+    static constexpr std::array<int, 6> values = {4, 6, 8, 10, 12, 15};
+    if (completedTrades < 0) {
+        return values.front();
+    }
+    if (completedTrades < static_cast<int>(values.size())) {
+        return values[static_cast<std::size_t>(completedTrades)];
+    }
+    return 15 + (completedTrades - 5) * 5;
+}
+
+std::vector<Card> GameEngine::makeRiskDeck() {
+    std::vector<Card> cards;
+    cards.reserve(44);
+    for (int territory = 0; territory < 42; ++territory) {
+        cards.push_back({territory, static_cast<CardType>(territory % 3), territory});
+    }
+    cards.push_back({42, CardType::Wild, -1});
+    cards.push_back({43, CardType::Wild, -1});
+    return cards;
+}
+
 std::vector<Continent> GameEngine::makeWorldContinents() {
     return {
         {0, "North America", 5, range(0, 8)},
@@ -618,6 +838,16 @@ std::string phaseName(Phase phase) {
         case Phase::Attack: return "Attack";
         case Phase::Maneuver: return "Maneuver";
         case Phase::Finished: return "Finished";
+    }
+    return "Unknown";
+}
+
+std::string cardTypeName(CardType type) {
+    switch (type) {
+        case CardType::Infantry: return "Infantry";
+        case CardType::Cavalry: return "Cavalry";
+        case CardType::Artillery: return "Artillery";
+        case CardType::Wild: return "Wild";
     }
     return "Unknown";
 }
