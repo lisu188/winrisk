@@ -43,6 +43,7 @@ class AppController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool running READ running NOTIFY stateChanged)
     Q_PROPERTY(QString modeText READ modeText NOTIFY stateChanged)
+    Q_PROPERTY(QString rulesText READ rulesText NOTIFY stateChanged)
     Q_PROPERTY(QString phaseText READ phaseText NOTIFY stateChanged)
     Q_PROPERTY(QString currentPlayerText READ currentPlayerText NOTIFY stateChanged)
     Q_PROPERTY(QColor currentPlayerColor READ currentPlayerColor NOTIFY stateChanged)
@@ -63,6 +64,7 @@ public:
 
     bool running() const;
     QString modeText() const;
+    QString rulesText() const;
     QString phaseText() const;
     QString currentPlayerText() const;
     QColor currentPlayerColor() const;
@@ -78,7 +80,16 @@ public:
     QString winnerText() const;
     BoardModel* boardModel();
 
-    Q_INVOKABLE bool startNewGame(int playerCount, int humanPlayers, int gameMode);
+    Q_INVOKABLE bool startNewGame(
+        int playerCount,
+        int humanPlayers,
+        int gameMode,
+        bool incrementalCardSetValues,
+        bool expandedManeuver,
+        bool attackCardReroll,
+        bool commanderDie,
+        bool attackWithAll
+    );
     Q_INVOKABLE void territoryTapped(int territoryId);
     Q_INVOKABLE bool tradeCards();
     Q_INVOKABLE bool endPhase();
