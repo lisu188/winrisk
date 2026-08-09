@@ -20,6 +20,29 @@ QString diceText(const std::vector<int>& dice) {
     return values.join(',');
 }
 
+QJsonArray intVectorToJson(const std::vector<int>& values) {
+    QJsonArray array;
+    for (const int value : values) {
+        array.push_back(value);
+    }
+    return array;
+}
+
+bool jsonToCardVector(const QJsonArray& array, std::vector<winrisk::Card>& cards, QString& error) {
+    const auto catalog = winrisk::GameEngine::makeRiskDeck();
+    cards.clear();
+    cards.reserve(static_cast<std::size_t>(array.size()));
+    for (const auto value : array) {
+        const int id = value.toInt(-1);
+        if (id < 0 || id >= static_cast<int>(catalog.size())) {
+            error = "Invalid card id";
+            return false;
+        }
+        cards.push_back(catalog[static_cast<std::size_t>(id)]);
+    }
+    return true;
+}
+
 QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     QJsonObject root;
     root.insert("schema", "winrisk-save");
@@ -28,6 +51,8 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     root.insert("currentPlayer", snapshot.currentPlayer);
     root.insert("winner", snapshot.winner);
     root.insert("turn", QString::number(snapshot.turn));
+    root.insert("tradeCount", snapshot.tradeCount);
+    root.insert("conqueredThisTurn", snapshot.conqueredThisTurn);
 
     QJsonArray rng;
     for (const auto value : snapshot.rngState) {
@@ -44,6 +69,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("ai", player.ai);
         object.insert("eliminated", player.eliminated);
         object.insert("reinforcements", player.reinforcements);
+        object.insert("cards", intVectorToJson(player.cards));
         players.push_back(object);
     }
     root.insert("players", players);
@@ -57,21 +83,36 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         territories.push_back(object);
     }
     root.insert("territories", territories);
+
+    QJsonArray deck;
+    for (const auto& card : snapshot.deck) {
+        deck.push_back(card.id);
+    }
+    root.insert("deck", deck);
+
+    QJsonArray discard;
+    for (const auto& card : snapshot.discard) {
+        discard.push_back(card.id);
+    }
+    root.insert("discard", discard);
     root.insert("mapId", "world");
     return root;
 }
 
-bool jsonToSnapshotV2(const QJsonObject& root, winrisk::Snapshot& snapshot, QString& error) {
-    if (root.value("version").toInt() != 2 || root.value("mapId").toString("world") != "world") {
+bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QString& error) {
+    const int version = root.value("version").toInt();
+    if ((version != 2 && version != 3) || root.value("mapId").toString("world") != "world") {
         error = "Unsupported WinRisk save version or map";
         return false;
     }
     snapshot = {};
-    snapshot.version = 2;
+    snapshot.version = version;
     snapshot.phase = static_cast<winrisk::Phase>(root.value("phase").toInt());
     snapshot.currentPlayer = root.value("currentPlayer").toInt();
     snapshot.winner = root.value("winner").toInt(-1);
     snapshot.turn = root.value("turn").toString("1").toULongLong();
+    snapshot.tradeCount = root.value("tradeCount").toInt();
+    snapshot.conqueredThisTurn = root.value("conqueredThisTurn").toBool();
 
     const QJsonArray rng = root.value("rng").toArray();
     if (rng.size() != 4) {
@@ -102,6 +143,15 @@ bool jsonToSnapshotV2(const QJsonObject& root, winrisk::Snapshot& snapshot, QStr
         player.ai = object.value("ai").toBool();
         player.eliminated = object.value("eliminated").toBool();
         player.reinforcements = object.value("reinforcements").toInt();
+        const QJsonArray cards = object.value("cards").toArray();
+        for (const auto cardValue : cards) {
+            const int cardId = cardValue.toInt(-1);
+            if (cardId < 0 || cardId >= 44) {
+                error = "Invalid player card";
+                return false;
+            }
+            player.cards.push_back(cardId);
+        }
         snapshot.players.push_back(std::move(player));
     }
 
@@ -121,6 +171,13 @@ bool jsonToSnapshotV2(const QJsonObject& root, winrisk::Snapshot& snapshot, QStr
         auto& territory = snapshot.territories[static_cast<std::size_t>(id)];
         territory.owner = object.value("owner").toInt(-1);
         territory.armies = object.value("armies").toInt();
+    }
+
+    if (version >= 3) {
+        if (!jsonToCardVector(root.value("deck").toArray(), snapshot.deck, error)
+            || !jsonToCardVector(root.value("discard").toArray(), snapshot.discard, error)) {
+            return false;
+        }
     }
     return true;
 }
@@ -305,6 +362,39 @@ int AppController::reinforcements() const {
     return player == nullptr ? 0 : player->reinforcements;
 }
 
+int AppController::cardCount() const {
+    const auto* player = engine_.currentPlayer();
+    return player == nullptr ? 0 : static_cast<int>(player->cards.size());
+}
+
+QString AppController::cardsText() const {
+    const auto* player = engine_.currentPlayer();
+    if (player == nullptr || player->cards.empty()) {
+        return "No cards";
+    }
+    const auto catalog = winrisk::GameEngine::makeRiskDeck();
+    std::array<int, 4> counts{};
+    for (const int cardId : player->cards) {
+        if (cardId >= 0 && cardId < static_cast<int>(catalog.size())) {
+            ++counts[static_cast<std::size_t>(catalog[static_cast<std::size_t>(cardId)].type)];
+        }
+    }
+    return QString("Inf %1  Cav %2  Art %3  Wild %4")
+        .arg(counts[0]).arg(counts[1]).arg(counts[2]).arg(counts[3]);
+}
+
+bool AppController::canTradeCards() const {
+    return engine_.phase() == winrisk::Phase::Reinforce && engine_.canTradeCards();
+}
+
+bool AppController::mustTradeCards() const {
+    return engine_.phase() == winrisk::Phase::Reinforce && engine_.mustTradeCards();
+}
+
+int AppController::nextTradeValue() const {
+    return engine_.nextTradeValue();
+}
+
 qulonglong AppController::turn() const {
     return engine_.turn();
 }
@@ -411,9 +501,25 @@ void AppController::territoryTapped(int territoryId) {
     }
 }
 
+bool AppController::tradeCards() {
+    const int bonus = engine_.tradeCards();
+    if (bonus <= 0) {
+        status_ = "No valid card set to trade";
+        refresh();
+        return false;
+    }
+    status_ = QString("Traded cards for %1 armies").arg(bonus);
+    refresh();
+    return true;
+}
+
 bool AppController::endPhase() {
     if (!engine_.endPhase()) {
-        status_ = engine_.phase() == winrisk::Phase::Reinforce ? "Place all reinforcements first" : "Cannot advance phase";
+        if (engine_.phase() == winrisk::Phase::Reinforce) {
+            status_ = engine_.mustTradeCards() ? "Trade a card set first" : "Place all reinforcements first";
+        } else {
+            status_ = "Cannot advance phase";
+        }
         refresh();
         return false;
     }
@@ -445,7 +551,7 @@ bool AppController::quickLoad() {
         return false;
     }
     setSelected(-1);
-    status_ = "Game loaded";
+    status_ = snapshot.version == 2 ? "Game loaded and upgraded to save v3" : "Game loaded";
     refresh();
     scheduleAi();
     return true;
@@ -516,8 +622,9 @@ bool AppController::loadSnapshot(const QString& path, winrisk::Snapshot& snapsho
         return false;
     }
     const QJsonObject root = document.object();
-    if (root.value("version").toInt() == 2) {
-        return jsonToSnapshotV2(root, snapshot, error);
+    const int version = root.value("version").toInt();
+    if (version == 2 || version == 3) {
+        return jsonToSnapshot(root, snapshot, error);
     }
     return legacyJavaJsonToSnapshot(root, raw, snapshot, error);
 }
