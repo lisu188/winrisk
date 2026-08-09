@@ -163,6 +163,9 @@ public:
     static std::vector<Continent> makeWorldContinents();
     static std::optional<MapDefinition> makeBuiltinMap(const std::string& mapId);
     static std::vector<std::string> builtinMapIds();
+    static MapDefinition generateProceduralMap(int fieldCount, int continentCount, std::uint64_t seed);
+    static std::string proceduralMapId(int fieldCount, int continentCount, std::uint64_t seed);
+    static std::optional<MapDefinition> makeMapDefinition(const std::string& mapId);
     static std::vector<Card> makeRiskDeck(int territoryCount = 42);
     static std::vector<MissionSpec> makeMissionDeck(int playerCount);
     static std::string missionDescription(const MissionSpec& mission);
