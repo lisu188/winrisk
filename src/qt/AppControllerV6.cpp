@@ -10,21 +10,21 @@
 #include <QStandardPaths>
 #include <QStringList>
 
+#include <array>
+#include <cstdint>
+#include <utility>
+
 namespace {
 
 QString diceText(const std::vector<int>& dice) {
     QStringList values;
-    for (const int value : dice) {
-        values.push_back(QString::number(value));
-    }
+    for (const int value : dice) values.push_back(QString::number(value));
     return values.join(',');
 }
 
 QJsonArray intVectorToJson(const std::vector<int>& values) {
     QJsonArray array;
-    for (const int value : values) {
-        array.push_back(value);
-    }
+    for (const int value : values) array.push_back(value);
     return array;
 }
 
@@ -61,6 +61,7 @@ QJsonObject rulesToJson(const winrisk::RulesOptions& rules) {
     object.insert("commanderDie", rules.commanderDie);
     object.insert("attackWithAll", rules.attackWithAll);
     object.insert("fogOfWar", rules.fogOfWar);
+    object.insert("skynet", rules.skynet);
     return object;
 }
 
@@ -72,6 +73,7 @@ winrisk::RulesOptions jsonToRules(const QJsonObject& object) {
     rules.commanderDie = object.value("commanderDie").toBool();
     rules.attackWithAll = object.value("attackWithAll").toBool();
     rules.fogOfWar = object.value("fogOfWar").toBool();
+    rules.skynet = object.value("skynet").toBool();
     return rules;
 }
 
@@ -108,9 +110,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     root.insert("maneuverTarget", snapshot.maneuverTarget);
 
     QJsonArray rng;
-    for (const auto value : snapshot.rngState) {
-        rng.push_back(QString::number(value, 16));
-    }
+    for (const auto value : snapshot.rngState) rng.push_back(QString::number(value, 16));
     root.insert("rng", rng);
 
     QJsonArray players;
@@ -125,9 +125,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("reinforcements", player.reinforcements);
         object.insert("cards", intVectorToJson(player.cards));
         object.insert("headquarters", player.headquarters);
-        if (player.mission) {
-            object.insert("mission", missionToJson(*player.mission));
-        }
+        if (player.mission) object.insert("mission", missionToJson(*player.mission));
         players.push_back(object);
     }
     root.insert("players", players);
@@ -143,15 +141,11 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
     root.insert("territories", territories);
 
     QJsonArray deck;
-    for (const auto& card : snapshot.deck) {
-        deck.push_back(card.id);
-    }
+    for (const auto& card : snapshot.deck) deck.push_back(card.id);
     root.insert("deck", deck);
 
     QJsonArray discard;
-    for (const auto& card : snapshot.discard) {
-        discard.push_back(card.id);
-    }
+    for (const auto& card : snapshot.discard) discard.push_back(card.id);
     root.insert("discard", discard);
     root.insert("mapId", "world");
     return root;
@@ -185,8 +179,18 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         snapshot.maneuverSource = root.value("maneuverSource").toInt(-1);
         snapshot.maneuverTarget = root.value("maneuverTarget").toInt(-1);
     }
+    if (version < 6) {
+        snapshot.rules.fogOfWar = false;
+        snapshot.rules.skynet = false;
+    }
 
-    snapshot.phase = static_cast<winrisk::Phase>(root.value("phase").toInt());
+    const int phase = root.value("phase").toInt(-1);
+    if (phase < static_cast<int>(winrisk::Phase::Reinforce)
+        || phase > static_cast<int>(winrisk::Phase::Finished)) {
+        error = "Invalid game phase";
+        return false;
+    }
+    snapshot.phase = static_cast<winrisk::Phase>(phase);
     snapshot.currentPlayer = root.value("currentPlayer").toInt();
     snapshot.winner = root.value("winner").toInt(-1);
     snapshot.turn = root.value("turn").toString("1").toULongLong();
@@ -234,9 +238,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         }
         if (version >= 4 && object.contains("mission")) {
             winrisk::MissionSpec mission;
-            if (!jsonToMission(object.value("mission").toObject(), mission, error)) {
-                return false;
-            }
+            if (!jsonToMission(object.value("mission").toObject(), mission, error)) return false;
             player.mission = mission;
         }
         snapshot.players.push_back(std::move(player));
@@ -281,20 +283,18 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
         error = "Legacy CAPITAL and SECRET_MISSION saves are not imported yet";
         return false;
     }
-    if (params.value("skynetMode").toBool()) {
-        error = "Legacy Skynet AI saves require the remaining AI migration";
-        return false;
-    }
 
     snapshot = {};
     snapshot.version = 6;
     snapshot.mode = winrisk::GameMode::Classic;
-    snapshot.rules.incrementalCardSetValues = params.value("incrementalCardSetValues").toBool();
-    snapshot.rules.expandedManeuver = params.value("expandedManeuver").toBool();
-    snapshot.rules.attackCardReroll = params.value("attackCardReroll").toBool();
-    snapshot.rules.commanderDie = params.value("commanderDie").toBool();
+    const QJsonObject legacyRules = params.value("rulesOptions").toObject();
+    snapshot.rules.incrementalCardSetValues = legacyRules.value("incrementalCardSetValues").toBool();
+    snapshot.rules.expandedManeuver = legacyRules.value("expandedManeuver").toBool();
+    snapshot.rules.attackCardReroll = legacyRules.value("attackCardReroll").toBool();
+    snapshot.rules.commanderDie = legacyRules.value("commanderDie").toBool();
     snapshot.rules.attackWithAll = params.value("attackWithAll").toBool();
     snapshot.rules.fogOfWar = params.value("fogOfWar").toBool();
+    snapshot.rules.skynet = params.value("skynetMode").toBool();
     snapshot.commanderDieUsed = root.value("commanderDieUsed").toBool();
 
     const QJsonArray oldPlayers = root.value("players").toArray();
@@ -309,9 +309,7 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
         player.color = static_cast<std::uint32_t>(signedColor);
         const QString interfaceClass = object.value("interfaceClass").toString();
         player.ai = player.neutral || !interfaceClass.contains("Human", Qt::CaseInsensitive);
-        if (player.ai && !player.neutral) {
-            player.name = "AI " + std::to_string(player.id + 1);
-        }
+        if (player.ai && !player.neutral) player.name = "AI " + std::to_string(player.id + 1);
         player.eliminated = player.neutral;
         player.reinforcements = object.value("reinforcements").toInt();
         oldToNew[static_cast<std::size_t>(i)] = player.id;
@@ -341,13 +339,9 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     }
 
     const QString phase = root.value("phase").toString();
-    if (phase == "ATTACK") {
-        snapshot.phase = winrisk::Phase::Attack;
-    } else if (phase == "MOVE") {
-        snapshot.phase = winrisk::Phase::Maneuver;
-    } else {
-        snapshot.phase = winrisk::Phase::Reinforce;
-    }
+    if (phase == "ATTACK") snapshot.phase = winrisk::Phase::Attack;
+    else if (phase == "MOVE") snapshot.phase = winrisk::Phase::Maneuver;
+    else snapshot.phase = winrisk::Phase::Reinforce;
 
     const int oldCurrent = root.value("curPlayer").toInt();
     if (oldCurrent < 0 || oldCurrent >= static_cast<int>(oldToNew.size())) {
@@ -361,40 +355,33 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     }
     snapshot.winner = -1;
     snapshot.turn = 1;
+    snapshot.tradeCount = root.value("tradeCount").toInt();
+    snapshot.conqueredThisTurn = false;
 
     const QByteArray digest = QCryptographicHash::hash(raw, QCryptographicHash::Sha256);
     std::uint64_t seed = 0;
-    for (int i = 0; i < 8; ++i) {
-        seed = (seed << 8) | static_cast<unsigned char>(digest[i]);
-    }
+    for (int i = 0; i < 8; ++i) seed = (seed << 8) | static_cast<unsigned char>(digest[i]);
     winrisk::Random importedRandom(seed);
     snapshot.rngState = importedRandom.state();
+
+    snapshot.deck = winrisk::GameEngine::makeRiskDeck();
+    snapshot.discard.clear();
     return true;
 }
 
 }
 
-BoardModel::BoardModel(QObject* parent)
-    : QAbstractListModel(parent) {
-}
+BoardModel::BoardModel(QObject* parent) : QAbstractListModel(parent) {}
 
 int BoardModel::rowCount(const QModelIndex& parent) const {
-    if (parent.isValid() || engine_ == nullptr) {
-        return 0;
-    }
+    if (parent.isValid() || engine_ == nullptr) return 0;
     return static_cast<int>(engine_->territories().size());
 }
 
 bool BoardModel::fieldVisible(const winrisk::Territory& territory) const {
-    if (engine_ == nullptr || !engine_->rules().fogOfWar) {
-        return true;
-    }
-    if (viewerPlayerId_ < 0 || viewerPlayerId_ >= static_cast<int>(engine_->players().size())) {
-        return true;
-    }
-    if (territory.owner == viewerPlayerId_) {
-        return true;
-    }
+    if (engine_ == nullptr || !engine_->rules().fogOfWar) return true;
+    if (viewerPlayerId_ < 0 || viewerPlayerId_ >= static_cast<int>(engine_->players().size())) return true;
+    if (territory.owner == viewerPlayerId_) return true;
     for (const int adjacentId : territory.adjacent) {
         if (adjacentId >= 0
             && adjacentId < static_cast<int>(engine_->territories().size())
@@ -406,15 +393,12 @@ bool BoardModel::fieldVisible(const winrisk::Territory& territory) const {
 }
 
 QVariant BoardModel::data(const QModelIndex& index, int role) const {
-    if (engine_ == nullptr || !index.isValid() || index.row() < 0 || index.row() >= rowCount()) {
-        return {};
-    }
+    if (engine_ == nullptr || !index.isValid() || index.row() < 0 || index.row() >= rowCount()) return {};
     const auto& territory = engine_->territories()[static_cast<std::size_t>(index.row())];
     const bool visible = fieldVisible(territory);
-
     switch (role) {
         case TerritoryIdRole: return territory.id;
-        case TerritoryNameRole: return territory.name.empty() ? QString() : QString::fromStdString(territory.name);
+        case TerritoryNameRole: return QString::fromStdString(territory.name);
         case XRole: return territory.x;
         case YRole: return territory.y;
         case FieldVisibleRole: return visible;
@@ -423,9 +407,7 @@ QVariant BoardModel::data(const QModelIndex& index, int role) const {
         case HeadquartersOwnerIdRole: return visible ? engine_->headquartersOwner(territory.id) : -1;
         case SelectedRole: return visible && territory.id == selectedId_;
         case OwnerColorRole:
-            if (!visible) {
-                return QColor("#26313a");
-            }
+            if (!visible) return QColor("#26313a");
             if (territory.owner >= 0 && territory.owner < static_cast<int>(engine_->players().size())) {
                 return QColor::fromRgba(engine_->players()[static_cast<std::size_t>(territory.owner)].color);
             }
@@ -456,29 +438,22 @@ void BoardModel::setEngine(const winrisk::GameEngine* engine) {
 }
 
 void BoardModel::setViewerPlayerId(int viewerPlayerId) {
-    if (viewerPlayerId_ == viewerPlayerId) {
-        return;
-    }
+    if (viewerPlayerId_ == viewerPlayerId) return;
     viewerPlayerId_ = viewerPlayerId;
     refresh();
 }
 
 void BoardModel::setSelectedId(int selectedId) {
-    if (selectedId_ == selectedId) {
-        return;
-    }
+    if (selectedId_ == selectedId) return;
     selectedId_ = selectedId;
     refresh();
 }
 
 void BoardModel::refresh() {
-    if (rowCount() > 0) {
-        emit dataChanged(index(0, 0), index(rowCount() - 1, 0));
-    }
+    if (rowCount() > 0) emit dataChanged(index(0, 0), index(rowCount() - 1, 0));
 }
 
-AppController::AppController(QObject* parent)
-    : QObject(parent), boardModel_(this) {
+AppController::AppController(QObject* parent) : QObject(parent), boardModel_(this) {
     boardModel_.setEngine(&engine_);
     aiTimer_.setSingleShot(true);
     aiTimer_.setInterval(140);
@@ -497,6 +472,7 @@ QString AppController::rulesText() const {
     if (rules.commanderDie) names << "Commander die";
     if (rules.attackWithAll) names << "Attack with all";
     if (rules.fogOfWar) names << "Fog of war";
+    if (rules.skynet) names << "Skynet";
     return names.isEmpty() ? QString("Standard rules") : names.join(", ");
 }
 
@@ -554,7 +530,8 @@ bool AppController::startNewGame(
     bool attackCardReroll,
     bool commanderDie,
     bool attackWithAll,
-    bool fogOfWar
+    bool fogOfWar,
+    bool skynet
 ) {
     aiTimer_.stop();
     if (gameMode < static_cast<int>(winrisk::GameMode::Classic)
@@ -571,6 +548,7 @@ bool AppController::startNewGame(
     rules.commanderDie = commanderDie;
     rules.attackWithAll = attackWithAll;
     rules.fogOfWar = fogOfWar;
+    rules.skynet = skynet;
 
     const auto mode = static_cast<winrisk::GameMode>(gameMode);
     const auto seed = QRandomGenerator::global()->generate64();
@@ -593,9 +571,7 @@ bool AppController::startNewGame(
 void AppController::territoryTapped(int territoryId) {
     const auto* player = engine_.currentPlayer();
     if (player == nullptr || player->ai || engine_.phase() == winrisk::Phase::Finished
-        || territoryId < 0 || territoryId >= static_cast<int>(engine_.territories().size())) {
-        return;
-    }
+        || territoryId < 0 || territoryId >= static_cast<int>(engine_.territories().size())) return;
     const auto& clicked = engine_.territories()[static_cast<std::size_t>(territoryId)];
 
     if (engine_.phase() == winrisk::Phase::Reinforce) {
@@ -626,9 +602,8 @@ void AppController::territoryTapped(int territoryId) {
                 .arg(result.attackerLosses)
                 .arg(result.defenderLosses)
                 .arg(result.captured ? " — captured" : "");
-            if (engine_.territories()[static_cast<std::size_t>(selectedId_)].armies < 2) {
-                setSelected(-1);
-            }
+            if (selectedId_ >= 0
+                && engine_.territories()[static_cast<std::size_t>(selectedId_)].armies < 2) setSelected(-1);
         }
         refresh();
         return;
@@ -681,9 +656,7 @@ bool AppController::endPhase() {
         return false;
     }
     setSelected(-1);
-    status_ = engine_.phase() == winrisk::Phase::Finished
-        ? winnerText()
-        : QString("Phase: %1").arg(phaseText());
+    status_ = engine_.phase() == winrisk::Phase::Finished ? winnerText() : QString("Phase: %1").arg(phaseText());
     refresh();
     scheduleAi();
     return true;
@@ -730,9 +703,7 @@ void AppController::returnToMenu() {
 
 void AppController::updateViewer() {
     const auto* current = engine_.currentPlayer();
-    if (current != nullptr && !current->ai && !current->neutral) {
-        viewerPlayerId_ = current->id;
-    }
+    if (current != nullptr && !current->ai && !current->neutral) viewerPlayerId_ = current->id;
 
     const auto validViewer = [&]() {
         return viewerPlayerId_ >= 0
@@ -743,9 +714,9 @@ void AppController::updateViewer() {
 
     if (!validViewer()) {
         viewerPlayerId_ = -1;
-        for (const auto& player : engine_.players()) {
-            if (!player.ai && !player.neutral) {
-                viewerPlayerId_ = player.id;
+        for (const auto& candidate : engine_.players()) {
+            if (!candidate.ai && !candidate.neutral) {
+                viewerPlayerId_ = candidate.id;
                 break;
             }
         }
@@ -766,16 +737,12 @@ void AppController::setSelected(int territoryId) {
 
 void AppController::scheduleAi() {
     const auto* player = engine_.currentPlayer();
-    if (engine_.running() && player != nullptr && player->ai && !aiTimer_.isActive()) {
-        aiTimer_.start();
-    }
+    if (engine_.running() && player != nullptr && player->ai && !aiTimer_.isActive()) aiTimer_.start();
 }
 
 void AppController::runAiStep() {
     const auto* player = engine_.currentPlayer();
-    if (!engine_.running() || player == nullptr || !player->ai) {
-        return;
-    }
+    if (!engine_.running() || player == nullptr || !player->ai) return;
     engine_.aiStep();
     status_ = engine_.phase() == winrisk::Phase::Finished
         ? winnerText()
@@ -792,9 +759,7 @@ QString AppController::quickSavePath() const {
 
 bool AppController::saveSnapshot(const winrisk::Snapshot& snapshot, const QString& path) {
     QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        return false;
-    }
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) return false;
     return file.write(QJsonDocument(snapshotToJson(snapshot)).toJson(QJsonDocument::Indented)) > 0;
 }
 
@@ -813,8 +778,6 @@ bool AppController::loadSnapshot(const QString& path, winrisk::Snapshot& snapsho
     }
     const QJsonObject root = document.object();
     const int version = root.value("version").toInt();
-    if (version >= 2 && version <= 6) {
-        return jsonToSnapshot(root, snapshot, error);
-    }
+    if (version >= 2 && version <= 6) return jsonToSnapshot(root, snapshot, error);
     return legacyJavaJsonToSnapshot(root, raw, snapshot, error);
 }
