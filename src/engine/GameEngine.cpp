@@ -94,7 +94,13 @@ GameEngine::GameEngine()
     : territories_(makeWorldTerritories()), continents_(makeWorldContinents()), random_(1) {
 }
 
-bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode) {
+bool GameEngine::startNewGame(
+    int playerCount,
+    int humanPlayers,
+    std::uint64_t seed,
+    GameMode mode,
+    RulesOptions rules
+) {
     const bool knownMode = mode == GameMode::Classic || mode == GameMode::SecretMission || mode == GameMode::Capital;
     const int minimumPlayers = mode == GameMode::Classic ? 2 : 3;
     if (!knownMode || playerCount < minimumPlayers || playerCount > 5
@@ -106,12 +112,14 @@ bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t s
     continents_ = makeWorldContinents();
     random_ = Random(seed);
     mode_ = mode;
+    rules_ = rules;
     phase_ = Phase::Reinforce;
     currentPlayer_ = 0;
     winner_ = -1;
     turn_ = 1;
     tradeCount_ = 0;
     conqueredThisTurn_ = false;
+    commanderDieUsed_ = false;
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
@@ -280,55 +288,16 @@ bool GameEngine::reinforce(int territoryId, int count) {
 }
 
 BattleResult GameEngine::attack(int sourceId, int targetId) {
-    BattleResult result;
-    if (phase_ != Phase::Attack || !canAttack(sourceId, targetId)) {
+    BattleResult result = resolveOneBattle(sourceId, targetId);
+    if (!result.legal || !rules_.attackWithAll) {
         return result;
     }
-
-    auto& source = territories_[static_cast<std::size_t>(sourceId)];
-    auto& target = territories_[static_cast<std::size_t>(targetId)];
-    const int defendingPlayer = target.owner;
-    const int attackCount = std::min(3, source.armies - 1);
-    const int defenseCount = std::min(2, target.armies);
-
-    result.legal = true;
-    result.attackDice.reserve(static_cast<std::size_t>(attackCount));
-    result.defenseDice.reserve(static_cast<std::size_t>(defenseCount));
-    for (int i = 0; i < attackCount; ++i) {
-        result.attackDice.push_back(random_.uniform(6) + 1);
-    }
-    for (int i = 0; i < defenseCount; ++i) {
-        result.defenseDice.push_back(random_.uniform(6) + 1);
-    }
-    std::sort(result.attackDice.begin(), result.attackDice.end(), std::greater<>());
-    std::sort(result.defenseDice.begin(), result.defenseDice.end(), std::greater<>());
-
-    const int comparisons = std::min(attackCount, defenseCount);
-    for (int i = 0; i < comparisons; ++i) {
-        if (result.attackDice[static_cast<std::size_t>(i)] > result.defenseDice[static_cast<std::size_t>(i)]) {
-            ++result.defenderLosses;
-        } else {
-            ++result.attackerLosses;
+    while (!result.captured && phase_ == Phase::Attack && canAttack(sourceId, targetId)) {
+        BattleResult next = resolveOneBattle(sourceId, targetId);
+        if (!next.legal) {
+            break;
         }
-    }
-
-    source.armies -= result.attackerLosses;
-    target.armies -= result.defenderLosses;
-    if (target.armies <= 0) {
-        const int occupation = std::clamp(attackCount - result.attackerLosses, 1, source.armies - 1);
-        target.owner = currentPlayer_;
-        target.armies = occupation;
-        source.armies -= occupation;
-        result.captured = true;
-        conqueredThisTurn_ = true;
-        if (defendingPlayer >= 0 && territoryCount(defendingPlayer) == 0) {
-            transferCards(defendingPlayer, currentPlayer_);
-            tradeAfterElimination(currentPlayer_);
-        }
-    }
-
-    if (defendingPlayer >= 0) {
-        updateEliminationsAndWinner();
+        result = std::move(next);
     }
     return result;
 }
@@ -337,7 +306,7 @@ bool GameEngine::maneuver(int sourceId, int targetId, int troops) {
     if (phase_ != Phase::Maneuver || troops <= 0 || !canManeuver(sourceId, targetId)) {
         return false;
     }
-    if (maneuverUsed_ && (sourceId != maneuverSource_ || targetId != maneuverTarget_)) {
+    if (!rules_.expandedManeuver && maneuverUsed_ && (sourceId != maneuverSource_ || targetId != maneuverTarget_)) {
         return false;
     }
     auto& source = territories_[static_cast<std::size_t>(sourceId)];
@@ -413,7 +382,7 @@ int GameEngine::tradeCardsForPlayer(int playerId) {
         }
     }
 
-    const int bonus = tradeValue(tradeCount_);
+    const int bonus = nextTradeValue();
     ++tradeCount_;
     player.reinforcements += bonus;
     for (const int id : ids) {
@@ -536,6 +505,14 @@ GameMode GameEngine::mode() const {
     return mode_;
 }
 
+const RulesOptions& GameEngine::rules() const {
+    return rules_;
+}
+
+bool GameEngine::commanderDieUsed() const {
+    return commanderDieUsed_;
+}
+
 Phase GameEngine::phase() const {
     return phase_;
 }
@@ -557,7 +534,7 @@ int GameEngine::tradeCount() const {
 }
 
 int GameEngine::nextTradeValue() const {
-    return tradeValue(tradeCount_);
+    return rules_.incrementalCardSetValues ? 4 + tradeCount_ : tradeValue(tradeCount_);
 }
 
 bool GameEngine::canTradeCards() const {
@@ -626,8 +603,9 @@ bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) cons
 
 Snapshot GameEngine::snapshot() const {
     Snapshot result;
-    result.version = 4;
+    result.version = 5;
     result.mode = mode_;
+    result.rules = rules_;
     result.phase = phase_;
     result.currentPlayer = currentPlayer_;
     result.winner = winner_;
@@ -639,11 +617,12 @@ Snapshot GameEngine::snapshot() const {
     result.discard = discard_;
     result.tradeCount = tradeCount_;
     result.conqueredThisTurn = conqueredThisTurn_;
+    result.commanderDieUsed = commanderDieUsed_;
     return result;
 }
 
 bool GameEngine::restore(const Snapshot& snapshot) {
-    if (snapshot.version < 2 || snapshot.version > 4
+    if (snapshot.version < 2 || snapshot.version > 5
         || snapshot.players.size() < 2 || snapshot.players.size() > 5
         || snapshot.territories.size() != 42) {
         return false;
@@ -749,6 +728,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     }
 
     mode_ = restoredMode;
+    rules_ = snapshot.rules;
     players_ = snapshot.players;
     territories_ = snapshot.territories;
     continents_ = makeWorldContinents();
@@ -759,6 +739,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     random_.setState(snapshot.rngState);
     tradeCount_ = std::max(0, snapshot.tradeCount);
     conqueredThisTurn_ = snapshot.conqueredThisTurn;
+    commanderDieUsed_ = rules_.commanderDie && snapshot.commanderDieUsed;
 
     if (snapshot.version >= 3) {
         deck_ = snapshot.deck;
@@ -786,6 +767,7 @@ void GameEngine::beginTurn() {
     }
     phase_ = Phase::Reinforce;
     conqueredThisTurn_ = false;
+    commanderDieUsed_ = false;
     maneuverUsed_ = false;
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
