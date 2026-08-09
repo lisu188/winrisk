@@ -1,5 +1,7 @@
 #include "engine/GameEngine.hpp"
 
+#include <utility>
+
 namespace winrisk {
 
 void GameEngine::addNeutralPlayer() {
