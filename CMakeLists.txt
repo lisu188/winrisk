@@ -13,7 +13,7 @@ find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 qt_standard_project_setup(REQUIRES 6.10)
 
 add_library(winrisk_engine STATIC
-    src/engine/GameEngine.cpp
+    src/engine/GameEngineCore.cpp
     src/engine/WorldMap.cpp
     src/engine/MissionRules.cpp
     src/engine/CapitalRules.cpp
@@ -25,7 +25,7 @@ target_include_directories(winrisk_engine PUBLIC src)
 target_compile_features(winrisk_engine PUBLIC cxx_std_20)
 
 add_library(winrisk_qt STATIC
-    src/qt/AppController.cpp
+    src/qt/AppControllerV6.cpp
 )
 
 target_include_directories(winrisk_qt PUBLIC src)
@@ -75,7 +75,7 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(winrisk_engine_tests tests/engine_tests.cpp)
+    add_executable(winrisk_engine_tests tests/engine_tests_v6.cpp)
     target_link_libraries(winrisk_engine_tests PRIVATE winrisk_engine)
     add_test(NAME winrisk_engine_tests COMMAND winrisk_engine_tests)
 endif()
