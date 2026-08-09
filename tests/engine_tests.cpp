@@ -131,6 +131,18 @@ int main() {
             CHECK(trading.tradeCount() == 1);
             CHECK(trading.nextTradeValue() == 6);
         }
+
+        Snapshot wildSnapshot = saved;
+        wildSnapshot.players[static_cast<std::size_t>(trader)].cards = {42, 43, 0};
+        GameEngine wildTrading;
+        CHECK(wildTrading.restore(wildSnapshot));
+        CHECK(wildTrading.canTradeCards());
+
+        Snapshot threeWildSnapshot = saved;
+        threeWildSnapshot.players[static_cast<std::size_t>(trader)].cards = {42, 43, 42};
+        GameEngine threeWildTrading;
+        CHECK(threeWildTrading.restore(threeWildSnapshot));
+        CHECK(!threeWildTrading.canTradeCards());
     }
 
     Snapshot legacyNative = saved;
