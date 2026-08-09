@@ -2,7 +2,7 @@
 
 #include <QCryptographicHash>
 #include <QJsonArray>
-#include <QJsonValue>
+#include <QRegularExpression>
 
 #include <array>
 #include <cstdint>
@@ -48,6 +48,30 @@ bool parsePhase(const QString& value, Phase& phase) {
     }
     if (value == "MOVE") {
         phase = Phase::Maneuver;
+        return true;
+    }
+    return false;
+}
+
+bool parseAiStrategy(const QString& className, AiStrategy& strategy) {
+    if (className.endsWith(".EasyAI") || className == "EasyAI") {
+        strategy = AiStrategy::Easy;
+        return true;
+    }
+    if (className.endsWith(".ContinentAI") || className == "ContinentAI") {
+        strategy = AiStrategy::Continent;
+        return true;
+    }
+    if (className.endsWith(".BalancedAI") || className == "BalancedAI") {
+        strategy = AiStrategy::Balanced;
+        return true;
+    }
+    if (className.endsWith(".BorderGuardAI") || className == "BorderGuardAI") {
+        strategy = AiStrategy::BorderGuard;
+        return true;
+    }
+    if (className.endsWith(".RandomAI") || className == "RandomAI") {
+        strategy = AiStrategy::Random;
         return true;
     }
     return false;
@@ -158,11 +182,13 @@ private:
     std::array<bool, 44> used_{};
 };
 
-std::uint64_t conversionSeed(const QJsonObject& params, const QByteArray& raw) {
-    const QJsonValue seedValue = params.value("randomSeed");
-    if (seedValue.isDouble()) {
-        const qint64 signedSeed = static_cast<qint64>(seedValue.toDouble());
-        return static_cast<std::uint64_t>(signedSeed);
+std::uint64_t conversionSeed(const QByteArray& raw) {
+    static const QRegularExpression pattern(QStringLiteral("\\\"randomSeed\\\"\\s*:\\s*(-?\\d+)"));
+    const auto match = pattern.match(QString::fromUtf8(raw));
+    if (match.hasMatch()) {
+        bool ok = false;
+        const qlonglong signedSeed = match.captured(1).toLongLong(&ok);
+        if (ok) return static_cast<std::uint64_t>(signedSeed);
     }
 
     const QByteArray digest = QCryptographicHash::hash(raw, QCryptographicHash::Sha256);
@@ -229,10 +255,15 @@ bool importJavaGameSketch(
         player.headquarters = object.value("headquartersIndex").toInt(-1);
         const QString interfaceClass = object.value("interfaceClass").toString();
         player.ai = player.neutral || !interfaceClass.contains("Human", Qt::CaseInsensitive);
+        if (player.ai && !player.neutral && !parseAiStrategy(interfaceClass, player.aiStrategy)) {
+            error = "Unsupported Java AI class: " + interfaceClass;
+            return false;
+        }
         player.eliminated = player.neutral;
         player.name = player.neutral
             ? "Neutral"
-            : player.ai ? "AI " + std::to_string(player.id + 1) : "Player " + std::to_string(player.id + 1);
+            : player.ai ? GameEngine::aiStrategyName(player.aiStrategy) + " AI " + std::to_string(player.id + 1)
+                        : "Player " + std::to_string(player.id + 1);
 
         if (object.contains("mission") && !object.value("mission").isNull()) {
             MissionSpec mission;
@@ -351,7 +382,7 @@ bool importJavaGameSketch(
 
     if (!cards.validateComplete(mode, snapshot.players, error)) return false;
 
-    Random convertedRandom(conversionSeed(params, raw));
+    Random convertedRandom(conversionSeed(raw));
     snapshot.rngState = convertedRandom.state();
     return true;
 }
