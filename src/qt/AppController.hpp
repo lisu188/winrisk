@@ -20,6 +20,7 @@ public:
         OwnerIdRole,
         OwnerColorRole,
         HeadquartersOwnerIdRole,
+        FieldVisibleRole,
         SelectedRole
     };
     Q_ENUM(Role)
@@ -31,11 +32,15 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void setEngine(const winrisk::GameEngine* engine);
+    void setViewerPlayerId(int viewerPlayerId);
     void setSelectedId(int selectedId);
     void refresh();
 
 private:
+    bool fieldVisible(const winrisk::Territory& territory) const;
+
     const winrisk::GameEngine* engine_ = nullptr;
+    int viewerPlayerId_ = -1;
     int selectedId_ = -1;
 };
 
@@ -88,7 +93,9 @@ public:
         bool expandedManeuver,
         bool attackCardReroll,
         bool commanderDie,
-        bool attackWithAll
+        bool attackWithAll,
+        bool fogOfWar,
+        bool skynet
     );
     Q_INVOKABLE void territoryTapped(int territoryId);
     Q_INVOKABLE bool tradeCards();
@@ -106,8 +113,10 @@ private:
     QTimer aiTimer_;
     QString status_;
     int selectedId_ = -1;
+    int viewerPlayerId_ = -1;
 
     void refresh();
+    void updateViewer();
     void setSelected(int territoryId);
     void scheduleAi();
     void runAiStep();
