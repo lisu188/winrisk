@@ -1,6 +1,7 @@
 #include "engine/GameEngine.hpp"
 
 #include <algorithm>
+#include <array>
 #include <iostream>
 
 using namespace winrisk;
@@ -200,7 +201,6 @@ int main() {
     GameEngine secretA;
     GameEngine secretB;
     CHECK(!secretA.startNewGame(2, 1, 9001, GameMode::SecretMission));
-    CHECK(!secretA.startNewGame(4, 1, 9001, GameMode::Capital));
     CHECK(secretA.startNewGame(4, 1, 9001, GameMode::SecretMission));
     CHECK(secretB.startNewGame(4, 1, 9001, GameMode::SecretMission));
     CHECK(secretA.mode() == GameMode::SecretMission);
@@ -246,6 +246,84 @@ int main() {
     CHECK(missionWinner.restore(winningMission));
     CHECK(missionWinner.winnerId() == 0);
     CHECK(missionWinner.phase() == Phase::Finished);
+
+    GameEngine capitalA;
+    GameEngine capitalB;
+    CHECK(!capitalA.startNewGame(2, 1, 12345, GameMode::Capital));
+    CHECK(capitalA.startNewGame(4, 1, 12345, GameMode::Capital));
+    CHECK(capitalB.startNewGame(4, 1, 12345, GameMode::Capital));
+    CHECK(capitalA.mode() == GameMode::Capital);
+    CHECK(capitalA.currentPlayerId() == capitalB.currentPlayerId());
+    CHECK(capitalA.deck().size() == 40);
+    CHECK(capitalA.players().size() == 4);
+
+    std::array<bool, 42> seenHeadquarters{};
+    for (const auto& player : capitalA.players()) {
+        CHECK(player.headquarters >= 0 && player.headquarters < 42);
+        if (player.headquarters >= 0 && player.headquarters < 42) {
+            CHECK(!seenHeadquarters[static_cast<std::size_t>(player.headquarters)]);
+            seenHeadquarters[static_cast<std::size_t>(player.headquarters)] = true;
+            CHECK(capitalA.territories()[static_cast<std::size_t>(player.headquarters)].owner == player.id);
+            CHECK(capitalA.headquartersOwner(player.headquarters) == player.id);
+            CHECK(capitalA.headquartersControlledBy(player.id) == 1);
+            CHECK(!capitalA.capitalObjectiveText(player.id).empty());
+            int firstOwned = -1;
+            for (const auto& territory : capitalA.territories()) {
+                if (territory.owner == player.id) {
+                    firstOwned = territory.id;
+                    break;
+                }
+            }
+            CHECK(player.headquarters == firstOwned);
+        }
+    }
+    for (const auto& card : capitalA.deck()) {
+        CHECK(card.territoryId < 0 || capitalA.headquartersOwner(card.territoryId) < 0);
+    }
+
+    const Snapshot capitalSaved = capitalA.snapshot();
+    CHECK(capitalSaved.version == 4);
+    CHECK(capitalSaved.mode == GameMode::Capital);
+    GameEngine capitalRestored;
+    CHECK(capitalRestored.restore(capitalSaved));
+    CHECK(capitalRestored.mode() == GameMode::Capital);
+    CHECK(capitalRestored.deck().size() == capitalA.deck().size());
+    for (std::size_t i = 0; i < capitalA.players().size(); ++i) {
+        CHECK(capitalRestored.players()[i].headquarters == capitalA.players()[i].headquarters);
+    }
+
+    Snapshot capitalWin = capitalSaved;
+    capitalWin.phase = Phase::Attack;
+    capitalWin.winner = -1;
+    for (std::size_t i = 0; i < capitalWin.players.size(); ++i) {
+        const int hq = capitalWin.players[i].headquarters;
+        capitalWin.territories[static_cast<std::size_t>(hq)].owner = 0;
+    }
+    for (std::size_t playerId = 1; playerId < capitalWin.players.size(); ++playerId) {
+        for (auto& territory : capitalWin.territories) {
+            if (capitalWin.headquarters < 0) {
+                break;
+            }
+            if (territory.owner == 0 && !seenHeadquarters[static_cast<std::size_t>(territory.id)]) {
+                territory.owner = static_cast<int>(playerId);
+                break;
+            }
+        }
+    }
+    GameEngine capitalWinner;
+    CHECK(capitalWinner.restore(capitalWin));
+    CHECK(capitalWinner.winnerId() == 0);
+    CHECK(capitalWinner.phase() == Phase::Finished);
+
+    Snapshot lostOwnHq = capitalWin;
+    lostOwnHq.phase = Phase::Attack;
+    lostOwnHq.winner = -1;
+    const int playerZeroHq = lostOwnHq.players[0].headquarters;
+    lostOwnHq.territories[static_cast<std::size_t>(playerZeroHq)].owner = 1;
+    GameEngine noCapitalWinner;
+    CHECK(noCapitalWinner.restore(lostOwnHq));
+    CHECK(noCapitalWinner.winnerId() < 0);
+    CHECK(noCapitalWinner.phase() == Phase::Attack);
 
     if (failures != 0) {
         std::cerr << failures << " test checks failed\n";
