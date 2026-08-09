@@ -47,6 +47,13 @@ struct Territory {
 
 struct Continent { int id = -1; std::string name; int bonus = 0; std::vector<int> territories; };
 
+struct MapDefinition {
+    std::string id;
+    std::string displayName;
+    std::vector<Territory> territories;
+    std::vector<Continent> continents;
+};
+
 struct Player {
     int id = -1;
     std::string name;
@@ -72,6 +79,7 @@ struct BattleResult {
 
 struct Snapshot {
     int version = 6;
+    std::string mapId = "world";
     GameMode mode = GameMode::Classic;
     RulesOptions rules;
     Phase phase = Phase::Reinforce;
@@ -105,7 +113,14 @@ private:
 class GameEngine {
 public:
     GameEngine();
-    bool startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode = GameMode::Classic, RulesOptions rules = {});
+    bool startNewGame(
+        int playerCount,
+        int humanPlayers,
+        std::uint64_t seed,
+        GameMode mode = GameMode::Classic,
+        RulesOptions rules = {},
+        const std::string& mapId = "world"
+    );
     bool reinforce(int territoryId, int count = 1);
     BattleResult attack(int sourceId, int targetId);
     bool maneuver(int sourceId, int targetId, int troops = 1);
@@ -119,6 +134,7 @@ public:
     const std::vector<Card>& deck() const;
     const std::vector<Card>& discard() const;
     const Player* currentPlayer() const;
+    const std::string& mapId() const;
     GameMode mode() const;
     const RulesOptions& rules() const;
     bool commanderDieUsed() const;
@@ -145,7 +161,9 @@ public:
 
     static std::vector<Territory> makeWorldTerritories();
     static std::vector<Continent> makeWorldContinents();
-    static std::vector<Card> makeRiskDeck();
+    static std::optional<MapDefinition> makeBuiltinMap(const std::string& mapId);
+    static std::vector<std::string> builtinMapIds();
+    static std::vector<Card> makeRiskDeck(int territoryCount = 42);
     static std::vector<MissionSpec> makeMissionDeck(int playerCount);
     static std::string missionDescription(const MissionSpec& mission);
     static std::string aiStrategyName(AiStrategy strategy);
@@ -156,10 +174,12 @@ private:
     std::vector<Territory> territories_;
     std::vector<Continent> continents_;
     std::vector<Player> players_;
+    std::vector<Card> cardCatalog_;
     std::vector<Card> deck_;
     std::vector<Card> discard_;
     std::vector<int> aiContinentGoals_;
     Random random_;
+    std::string mapId_ = "world";
     GameMode mode_ = GameMode::Classic;
     RulesOptions rules_;
     Phase phase_ = Phase::Finished;
