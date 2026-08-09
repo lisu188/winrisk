@@ -11,8 +11,11 @@ The `qt-cpp` implementation already contains:
 - deterministic xoshiro-family RNG with serialized state
 - Classic mode for 2–5 players
 - Secret Mission mode for 3–5 players with the Java mission deck semantics
+- Capital mode for 3–5 players with original-HQ victory semantics
+- Java-compatible highest-die starting player and map-order claim setup for 3–5 player Classic/Capital games
 - deterministic mission assignment excluding self-elimination objectives
 - territory, fortified-territory, continent and elimination mission victory checks
+- Capital HQ assignment, HQ-card exclusion, board markers and capture-all-HQs victory checks
 - human and AI players
 - reinforcement phase
 - Risk dice combat, captures and elimination
@@ -20,10 +23,11 @@ The `qt-cpp` implementation already contains:
 - deterministic 44-card Risk deck with Infantry, Cavalry, Artillery and Wild cards
 - card awards after conquest, elimination card transfer and Java-compatible wildcard sets
 - progressive card trade values, forced reinforcement trades and immediate elimination trades
-- asynchronous one-action-at-a-time AI turns, including card trading
+- asynchronous one-action-at-a-time AI turns, including card trading and HQ-aware attack scoring
 - Qt `QAbstractListModel` presentation layer
-- responsive Qt Quick desktop/tablet/phone UI
+- responsive Qt Quick desktop/tablet/phone UI with mode selection, mission/objective HUD and HQ badges
 - native quick-save/load using versioned JSON schema v4
+- schema-v4 persistence of mode, missions and original headquarters
 - migration of native schema-v2/v3 saves to v4
 - import of current Java JSON saves for standard-map Classic games without neutral armies
 - CTest engine tests that run in Debug and Release builds
@@ -81,11 +85,11 @@ Pure C++ GameEngine
 
 The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, card trading, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
 
-Game modes and mission rules are also pure C++ and are serialized as explicit value types rather than QML state.
+Game modes, missions and Capital headquarters are pure C++ state and are serialized as explicit value types rather than QML state.
 
 ## Persistence
 
-New saves use JSON schema version 4 and contain the game mode, stable player/territory/card IDs, Secret Mission objectives, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
+New saves use JSON schema version 4 and contain the game mode, stable player/territory/card IDs, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
 
 Native schema-v2 and schema-v3 saves remain loadable as Classic games. Schema-v2 saves reconstruct the deterministic card system while preserving their stored gameplay RNG state.
 
@@ -95,9 +99,7 @@ The loader can also recognize the current Java Gson `GameSketch` JSON representa
 
 The C++ milestone is playable but does not yet cover every feature of the Java version. Remaining migration work includes:
 
-- Capital mode and HQ victory rules
-- official two-player neutral-army setup
-- exact interactive territory-claiming setup for 3–5 player Classic/Capital games
+- official two-player neutral-army setup and neutral defense ownership
 - fog of war and remaining optional rules
 - historical and procedural maps
 - full Java save parity for Secret Mission/Capital, legacy cards and old Java ObjectStream saves
