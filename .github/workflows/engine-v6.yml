@@ -10,6 +10,7 @@ on:
       - 'tests/engine_tests_v6.cpp'
       - 'tests/ai_strategy_tests.cpp'
       - 'tests/builtin_map_tests.cpp'
+      - 'tests/procedural_map_tests.cpp'
       - '.github/workflows/engine-v6.yml'
   pull_request:
     branches:
@@ -19,6 +20,7 @@ on:
       - 'tests/engine_tests_v6.cpp'
       - 'tests/ai_strategy_tests.cpp'
       - 'tests/builtin_map_tests.cpp'
+      - 'tests/procedural_map_tests.cpp'
       - '.github/workflows/engine-v6.yml'
   workflow_dispatch:
 
@@ -28,59 +30,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build strict C++20 engine tests
-        run: >-
-          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror
-          -Isrc
-          src/engine/GameEngineCore.cpp
-          src/engine/WorldMap.cpp
-          src/engine/BuiltinMaps.cpp
-          src/engine/MissionRules.cpp
-          src/engine/CapitalRules.cpp
-          src/engine/TwoPlayerRules.cpp
-          src/engine/CombatRules.cpp
-          src/engine/AiIdentity.cpp
-          src/engine/AiStrategies.cpp
-          tests/engine_tests_v6.cpp
-          -o winrisk_engine_tests
-
-      - name: Run engine tests
-        run: ./winrisk_engine_tests
-
-      - name: Build strict Java AI strategy tests
-        run: >-
-          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror
-          -Isrc
-          src/engine/GameEngineCore.cpp
-          src/engine/WorldMap.cpp
-          src/engine/BuiltinMaps.cpp
-          src/engine/MissionRules.cpp
-          src/engine/CapitalRules.cpp
-          src/engine/TwoPlayerRules.cpp
-          src/engine/CombatRules.cpp
-          src/engine/AiIdentity.cpp
-          src/engine/AiStrategies.cpp
-          tests/ai_strategy_tests.cpp
-          -o winrisk_ai_strategy_tests
-
-      - name: Run Java AI strategy tests
-        run: ./winrisk_ai_strategy_tests
-
-      - name: Build strict built-in map tests
-        run: >-
-          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror
-          -Isrc
-          src/engine/GameEngineCore.cpp
-          src/engine/WorldMap.cpp
-          src/engine/BuiltinMaps.cpp
-          src/engine/MissionRules.cpp
-          src/engine/CapitalRules.cpp
-          src/engine/TwoPlayerRules.cpp
-          src/engine/CombatRules.cpp
-          src/engine/AiIdentity.cpp
-          src/engine/AiStrategies.cpp
-          tests/builtin_map_tests.cpp
-          -o winrisk_builtin_map_tests
-
-      - name: Run built-in map tests
-        run: ./winrisk_builtin_map_tests
+      - name: Build and run strict C++20 engine suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sources=(
+            src/engine/GameEngineCore.cpp
+            src/engine/WorldMap.cpp
+            src/engine/BuiltinMaps.cpp
+            src/engine/ProceduralMap.cpp
+            src/engine/MissionRules.cpp
+            src/engine/CapitalRules.cpp
+            src/engine/TwoPlayerRules.cpp
+            src/engine/CombatRules.cpp
+            src/engine/AiIdentity.cpp
+            src/engine/AiStrategies.cpp
+          )
+          tests=(
+            engine_tests_v6
+            ai_strategy_tests
+            builtin_map_tests
+            procedural_map_tests
+          )
+          for test in "${tests[@]}"; do
+            g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror -Isrc \
+              "${sources[@]}" "tests/${test}.cpp" -o "$test"
+            "./$test"
+          done
