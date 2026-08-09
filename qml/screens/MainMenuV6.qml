@@ -102,12 +102,21 @@ Item {
                         CheckBox { id: commanderDie; text: "Commander die" }
                         CheckBox { id: attackWithAll; text: "Attack with all" }
                         CheckBox { id: fogOfWar; text: "Fog of war" }
+                        CheckBox { id: skynet; text: "Skynet" }
                     }
 
                     Label {
                         Layout.fillWidth: true
                         visible: fogOfWar.checked
                         text: "Fog shows your territories and their immediate neighbors. During AI turns the board remains scoped to the last human viewer."
+                        color: "#9aa7b4"
+                        wrapMode: Text.Wrap
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        visible: skynet.checked
+                        text: "Skynet reproduces the Java rule: when an AI attack position has an adjacent human target, it targets a human instead of an AI or neutral player from that position."
                         color: "#9aa7b4"
                         wrapMode: Text.Wrap
                     }
@@ -126,7 +135,8 @@ Item {
                             attackCardReroll.checked,
                             commanderDie.checked,
                             attackWithAll.checked,
-                            fogOfWar.checked
+                            fogOfWar.checked,
+                            skynet.checked
                         )
                     }
 
