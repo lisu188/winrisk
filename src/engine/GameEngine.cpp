@@ -144,16 +144,17 @@ bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t s
         assignHeadquarters();
         initializeDeck();
         removeHeadquartersFromDeck();
-    } else if (playerCount >= 3) {
+    } else if (playerCount == 2) {
+        addNeutralPlayer();
+        distributeTerritories();
+        placeTwoPlayerStartingTroops();
+        initializeDeck();
+        currentPlayer_ = rollHighestPlayer();
+    } else {
         currentPlayer_ = rollHighestPlayer();
         claimTerritories(currentPlayer_);
         placeStartingTroopsOfficial();
         initializeDeck();
-    } else {
-        distributeTerritories();
-        placeStartingTroops();
-        initializeDeck();
-        currentPlayer_ = rollHighestPlayer();
     }
 
     beginTurn();
@@ -662,16 +663,32 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     }
 
     const GameMode restoredMode = snapshot.version >= 4 ? snapshot.mode : GameMode::Classic;
-    if ((restoredMode == GameMode::SecretMission || restoredMode == GameMode::Capital)
-        && snapshot.players.size() < 3) {
-        return false;
-    }
     if (restoredMode != GameMode::Classic
         && restoredMode != GameMode::SecretMission
         && restoredMode != GameMode::Capital) {
         return false;
     }
-    if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size())) {
+
+    int neutralCount = 0;
+    int activeCount = 0;
+    for (const auto& player : snapshot.players) {
+        if (player.neutral) {
+            ++neutralCount;
+        } else {
+            ++activeCount;
+        }
+    }
+    if (neutralCount > 0) {
+        if (restoredMode != GameMode::Classic || neutralCount != 1 || activeCount != 2 || snapshot.players.size() != 3) {
+            return false;
+        }
+    } else if ((restoredMode == GameMode::SecretMission || restoredMode == GameMode::Capital)
+        && snapshot.players.size() < 3) {
+        return false;
+    }
+
+    if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size())
+        || snapshot.players[static_cast<std::size_t>(snapshot.currentPlayer)].neutral) {
         return false;
     }
 
@@ -690,12 +707,16 @@ bool GameEngine::restore(const Snapshot& snapshot) {
                 return false;
             }
         }
-        if (restoredMode == GameMode::SecretMission && !player.mission.has_value()) {
+        if (player.neutral && (!player.cards.empty() || player.mission.has_value() || player.headquarters >= 0)) {
+            return false;
+        }
+        if (restoredMode == GameMode::SecretMission && !player.neutral && !player.mission.has_value()) {
             return false;
         }
         if (player.mission && player.mission->kind == MissionKind::Elimination
             && (player.mission->eliminationTarget < 0
-                || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size()))) {
+                || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size())
+                || snapshot.players[static_cast<std::size_t>(player.mission->eliminationTarget)].neutral)) {
             return false;
         }
         if (restoredMode == GameMode::Capital) {
@@ -814,6 +835,10 @@ void GameEngine::updateEliminationsAndWinner() {
     int alive = 0;
     int candidate = -1;
     for (auto& player : players_) {
+        if (player.neutral) {
+            player.eliminated = true;
+            continue;
+        }
         player.eliminated = territoryCount(player.id) == 0;
         if (!player.eliminated) {
             ++alive;
@@ -823,7 +848,7 @@ void GameEngine::updateEliminationsAndWinner() {
 
     if (mode_ == GameMode::SecretMission) {
         for (const auto& player : players_) {
-            if (!player.eliminated && player.mission && missionCompleted(player.id, *player.mission)) {
+            if (!player.neutral && !player.eliminated && player.mission && missionCompleted(player.id, *player.mission)) {
                 winner_ = player.id;
                 phase_ = Phase::Finished;
                 return;
@@ -1010,7 +1035,7 @@ std::vector<Territory> GameEngine::makeWorldTerritories() {
         {9,10},{9,11},{10,11},{10,12},{11,12},{11,20},
         {13,14},{13,16},{14,15},{14,16},{14,17},{15,17},{15,19},{15,26},{15,33},{15,35},{16,17},{16,18},{17,18},{17,19},{18,19},{18,20},{19,20},{19,21},{19,35},
         {20,21},{20,22},{20,23},{21,22},{21,35},{22,23},{22,24},{22,25},{22,35},{23,24},{24,25},
-        {26,27},{26,33},{26,34},{27,28},{27,30},{27,31},{27,34},{28,29},{28,30},{29,30},{29,31},{29,32},{30,31},{31,32},{31,34},{33,34},{33,35},{33,36},{34,36},{34,37},{35,36},{36,37},
+        {26,27},{26,33},{26,34},{27,28},{27,30},{27,31},{27,34},{28,29},{28,30},{29,30},{29,31},{29,32},{31,32},{31,34},{33,34},{33,35},{33,36},{34,36},{34,37},{35,36},{36,37},
         {37,38},{38,39},{38,40},{39,40},{39,41},{40,41}
     }};
     for (const auto& edge : edges) {
