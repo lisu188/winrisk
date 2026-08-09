@@ -93,6 +93,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("name", QString::fromStdString(player.name));
         object.insert("color", QString::number(player.color, 16));
         object.insert("ai", player.ai);
+        object.insert("neutral", player.neutral);
         object.insert("eliminated", player.eliminated);
         object.insert("reinforcements", player.reinforcements);
         object.insert("cards", intVectorToJson(player.cards));
@@ -184,6 +185,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
             return false;
         }
         player.ai = object.value("ai").toBool();
+        player.neutral = object.value("neutral").toBool();
         player.eliminated = object.value("eliminated").toBool();
         player.reinforcements = object.value("reinforcements").toInt();
         player.headquarters = object.value("headquarters").toInt(-1);
@@ -251,20 +253,18 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     snapshot.mode = winrisk::GameMode::Classic;
     for (qsizetype i = 0; i < oldPlayers.size(); ++i) {
         const QJsonObject object = oldPlayers[i].toObject();
-        if (object.value("neutral").toBool()) {
-            error = "Legacy two-player neutral-army saves require the two-player rules migration";
-            return false;
-        }
         winrisk::Player player;
         player.id = static_cast<int>(snapshot.players.size());
-        player.name = "Player " + std::to_string(player.id + 1);
+        player.neutral = object.value("neutral").toBool();
+        player.name = player.neutral ? "Neutral" : "Player " + std::to_string(player.id + 1);
         const qint64 signedColor = static_cast<qint64>(object.value("colorRgb").toDouble());
         player.color = static_cast<std::uint32_t>(signedColor);
         const QString interfaceClass = object.value("interfaceClass").toString();
-        player.ai = !interfaceClass.contains("Human", Qt::CaseInsensitive);
-        if (player.ai) {
+        player.ai = player.neutral || !interfaceClass.contains("Human", Qt::CaseInsensitive);
+        if (player.ai && !player.neutral) {
             player.name = "AI " + std::to_string(player.id + 1);
         }
+        player.eliminated = player.neutral;
         player.reinforcements = object.value("reinforcements").toInt();
         oldToNew[static_cast<std::size_t>(i)] = player.id;
         snapshot.players.push_back(std::move(player));
@@ -303,6 +303,10 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
         return false;
     }
     snapshot.currentPlayer = oldToNew[static_cast<std::size_t>(oldCurrent)];
+    if (snapshot.players[static_cast<std::size_t>(snapshot.currentPlayer)].neutral) {
+        error = "Legacy save has neutral current player";
+        return false;
+    }
     snapshot.winner = -1;
     snapshot.turn = 1;
 
