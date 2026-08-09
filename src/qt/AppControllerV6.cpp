@@ -1,6 +1,6 @@
 #include "qt/AppController.hpp"
+#include "qt/LegacyJavaImporter.hpp"
 
-#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -11,7 +11,6 @@
 #include <QStringList>
 
 #include <array>
-#include <cstdint>
 #include <utility>
 
 namespace {
@@ -268,104 +267,6 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
             return false;
         }
     }
-    return true;
-}
-
-bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, winrisk::Snapshot& snapshot, QString& error) {
-    if (!root.contains("fieldOwner") || !root.contains("fieldArmy") || !root.contains("players")) {
-        error = "Unsupported save format";
-        return false;
-    }
-
-    const QJsonObject params = root.value("params").toObject();
-    const QString mode = params.value("gameMode").toString("CLASSIC");
-    if (mode != "CLASSIC") {
-        error = "Legacy CAPITAL and SECRET_MISSION saves are not imported yet";
-        return false;
-    }
-
-    snapshot = {};
-    snapshot.version = 6;
-    snapshot.mode = winrisk::GameMode::Classic;
-    const QJsonObject legacyRules = params.value("rulesOptions").toObject();
-    snapshot.rules.incrementalCardSetValues = legacyRules.value("incrementalCardSetValues").toBool();
-    snapshot.rules.expandedManeuver = legacyRules.value("expandedManeuver").toBool();
-    snapshot.rules.attackCardReroll = legacyRules.value("attackCardReroll").toBool();
-    snapshot.rules.commanderDie = legacyRules.value("commanderDie").toBool();
-    snapshot.rules.attackWithAll = params.value("attackWithAll").toBool();
-    snapshot.rules.fogOfWar = params.value("fogOfWar").toBool();
-    snapshot.rules.skynet = params.value("skynetMode").toBool();
-    snapshot.commanderDieUsed = root.value("commanderDieUsed").toBool();
-
-    const QJsonArray oldPlayers = root.value("players").toArray();
-    std::vector<int> oldToNew(static_cast<std::size_t>(oldPlayers.size()), -1);
-    for (qsizetype i = 0; i < oldPlayers.size(); ++i) {
-        const QJsonObject object = oldPlayers[i].toObject();
-        winrisk::Player player;
-        player.id = static_cast<int>(snapshot.players.size());
-        player.neutral = object.value("neutral").toBool();
-        player.name = player.neutral ? "Neutral" : "Player " + std::to_string(player.id + 1);
-        const qint64 signedColor = static_cast<qint64>(object.value("colorRgb").toDouble());
-        player.color = static_cast<std::uint32_t>(signedColor);
-        const QString interfaceClass = object.value("interfaceClass").toString();
-        player.ai = player.neutral || !interfaceClass.contains("Human", Qt::CaseInsensitive);
-        if (player.ai && !player.neutral) player.name = "AI " + std::to_string(player.id + 1);
-        player.eliminated = player.neutral;
-        player.reinforcements = object.value("reinforcements").toInt();
-        oldToNew[static_cast<std::size_t>(i)] = player.id;
-        snapshot.players.push_back(std::move(player));
-    }
-    if (snapshot.players.size() < 2 || snapshot.players.size() > 5) {
-        error = "Unsupported legacy player count";
-        return false;
-    }
-
-    snapshot.territories = winrisk::GameEngine::makeWorldTerritories();
-    const QJsonArray owners = root.value("fieldOwner").toArray();
-    const QJsonArray armies = root.value("fieldArmy").toArray();
-    if (owners.size() != 42 || armies.size() != 42) {
-        error = "Only the standard world map can currently be imported from Java saves";
-        return false;
-    }
-    for (qsizetype i = 0; i < 42; ++i) {
-        const int oldOwner = owners[i].toInt(-1);
-        if (oldOwner < 0 || oldOwner >= static_cast<int>(oldToNew.size())
-            || oldToNew[static_cast<std::size_t>(oldOwner)] < 0) {
-            error = "Invalid legacy territory owner";
-            return false;
-        }
-        snapshot.territories[static_cast<std::size_t>(i)].owner = oldToNew[static_cast<std::size_t>(oldOwner)];
-        snapshot.territories[static_cast<std::size_t>(i)].armies = armies[i].toInt();
-    }
-
-    const QString phase = root.value("phase").toString();
-    if (phase == "ATTACK") snapshot.phase = winrisk::Phase::Attack;
-    else if (phase == "MOVE") snapshot.phase = winrisk::Phase::Maneuver;
-    else snapshot.phase = winrisk::Phase::Reinforce;
-
-    const int oldCurrent = root.value("curPlayer").toInt();
-    if (oldCurrent < 0 || oldCurrent >= static_cast<int>(oldToNew.size())) {
-        error = "Invalid legacy current player";
-        return false;
-    }
-    snapshot.currentPlayer = oldToNew[static_cast<std::size_t>(oldCurrent)];
-    if (snapshot.players[static_cast<std::size_t>(snapshot.currentPlayer)].neutral) {
-        error = "Legacy save has neutral current player";
-        return false;
-    }
-    snapshot.winner = -1;
-    snapshot.turn = 1;
-    snapshot.tradeCount = root.value("tradeCount").toInt();
-    snapshot.conqueredThisTurn = false;
-
-    const QByteArray digest = QCryptographicHash::hash(raw, QCryptographicHash::Sha256);
-    std::uint64_t seed = 0;
-    for (int i = 0; i < 8; ++i) seed = (seed << 8) | static_cast<unsigned char>(digest[i]);
-    winrisk::Random importedRandom(seed);
-    snapshot.rngState = importedRandom.state();
-
-    snapshot.deck = winrisk::GameEngine::makeRiskDeck();
-    snapshot.discard.clear();
     return true;
 }
 
@@ -779,5 +680,5 @@ bool AppController::loadSnapshot(const QString& path, winrisk::Snapshot& snapsho
     const QJsonObject root = document.object();
     const int version = root.value("version").toInt();
     if (version >= 2 && version <= 6) return jsonToSnapshot(root, snapshot, error);
-    return legacyJavaJsonToSnapshot(root, raw, snapshot, error);
+    return winrisk::qt::importJavaGameSketch(root, raw, snapshot, error);
 }
