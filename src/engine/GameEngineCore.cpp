@@ -286,7 +286,13 @@ bool GameEngine::restore(const Snapshot& snapshot) {
         for (const auto& card : snapshot.discard) if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) return false;
     }
 
-    mode_ = restoredMode; rules_ = snapshot.rules; players_ = snapshot.players; territories_ = snapshot.territories; continents_ = makeWorldContinents(); phase_ = snapshot.phase;
+    mode_ = restoredMode;
+    rules_ = snapshot.version >= 5 ? snapshot.rules : RulesOptions{};
+    if (snapshot.version < 6) {
+        rules_.fogOfWar = false;
+        rules_.skynet = false;
+    }
+    players_ = snapshot.players; territories_ = snapshot.territories; continents_ = makeWorldContinents(); phase_ = snapshot.phase;
     currentPlayer_ = snapshot.currentPlayer; winner_ = snapshot.winner; turn_ = snapshot.turn; random_.setState(snapshot.rngState); tradeCount_ = std::max(0, snapshot.tradeCount); conqueredThisTurn_ = snapshot.conqueredThisTurn;
     commanderDieUsed_ = rules_.commanderDie && snapshot.commanderDieUsed;
     if (snapshot.version >= 5) { maneuverUsed_ = snapshot.maneuverUsed; maneuverSource_ = snapshot.maneuverSource; maneuverTarget_ = snapshot.maneuverTarget; }
