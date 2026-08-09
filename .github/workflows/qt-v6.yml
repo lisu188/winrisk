@@ -19,9 +19,7 @@ on:
       - 'qml/screens/GameScreenV6.qml'
       - 'qml/components/BoardPaneV6.qml'
       - 'qml/components/ControlPanel.qml'
-      - 'tests/engine_tests_v6.cpp'
-      - 'tests/fog_model_tests.cpp'
-      - 'tests/legacy_java_import_tests.cpp'
+      - 'tests/**'
       - 'platform/android/**'
       - '.github/workflows/qt-v6.yml'
   pull_request:
@@ -41,9 +39,7 @@ on:
       - 'qml/screens/GameScreenV6.qml'
       - 'qml/components/BoardPaneV6.qml'
       - 'qml/components/ControlPanel.qml'
-      - 'tests/engine_tests_v6.cpp'
-      - 'tests/fog_model_tests.cpp'
-      - 'tests/legacy_java_import_tests.cpp'
+      - 'tests/**'
       - 'platform/android/**'
       - '.github/workflows/qt-v6.yml'
   workflow_dispatch:
