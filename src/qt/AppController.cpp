@@ -96,6 +96,7 @@ QJsonObject snapshotToJson(const winrisk::Snapshot& snapshot) {
         object.insert("eliminated", player.eliminated);
         object.insert("reinforcements", player.reinforcements);
         object.insert("cards", intVectorToJson(player.cards));
+        object.insert("headquarters", player.headquarters);
         if (player.mission) {
             object.insert("mission", missionToJson(*player.mission));
         }
@@ -134,6 +135,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         error = "Unsupported WinRisk save version or map";
         return false;
     }
+
     snapshot = {};
     snapshot.version = version;
     if (version >= 4) {
@@ -147,6 +149,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
     } else {
         snapshot.mode = winrisk::GameMode::Classic;
     }
+
     snapshot.phase = static_cast<winrisk::Phase>(root.value("phase").toInt());
     snapshot.currentPlayer = root.value("currentPlayer").toInt();
     snapshot.winner = root.value("winner").toInt(-1);
@@ -183,6 +186,7 @@ bool jsonToSnapshot(const QJsonObject& root, winrisk::Snapshot& snapshot, QStrin
         player.ai = object.value("ai").toBool();
         player.eliminated = object.value("eliminated").toBool();
         player.reinforcements = object.value("reinforcements").toInt();
+        player.headquarters = object.value("headquarters").toInt(-1);
         const QJsonArray cards = object.value("cards").toArray();
         for (const auto cardValue : cards) {
             const int cardId = cardValue.toInt(-1);
@@ -279,7 +283,8 @@ bool legacyJavaJsonToSnapshot(const QJsonObject& root, const QByteArray& raw, wi
     }
     for (qsizetype i = 0; i < 42; ++i) {
         const int oldOwner = owners[i].toInt(-1);
-        if (oldOwner < 0 || oldOwner >= static_cast<int>(oldToNew.size()) || oldToNew[static_cast<std::size_t>(oldOwner)] < 0) {
+        if (oldOwner < 0 || oldOwner >= static_cast<int>(oldToNew.size())
+            || oldToNew[static_cast<std::size_t>(oldOwner)] < 0) {
             error = "Invalid legacy territory owner";
             return false;
         }
@@ -336,6 +341,7 @@ QVariant BoardModel::data(const QModelIndex& index, int role) const {
         case YRole: return territory.y;
         case ArmiesRole: return territory.armies;
         case OwnerIdRole: return territory.owner;
+        case HeadquartersOwnerIdRole: return engine_->headquartersOwner(territory.id);
         case SelectedRole: return territory.id == selectedId_;
         case OwnerColorRole:
             if (territory.owner >= 0 && territory.owner < static_cast<int>(engine_->players().size())) {
@@ -355,6 +361,7 @@ QHash<int, QByteArray> BoardModel::roleNames() const {
         {ArmiesRole, "armies"},
         {OwnerIdRole, "ownerId"},
         {OwnerColorRole, "ownerColor"},
+        {HeadquartersOwnerIdRole, "headquartersOwnerId"},
         {SelectedRole, "selected"}
     };
 }
@@ -411,7 +418,13 @@ QColor AppController::currentPlayerColor() const {
 
 QString AppController::missionText() const {
     const auto* player = engine_.currentPlayer();
-    if (player == nullptr || engine_.mode() != winrisk::GameMode::SecretMission) {
+    if (player == nullptr) {
+        return {};
+    }
+    if (engine_.mode() == winrisk::GameMode::Capital) {
+        return QString::fromStdString(engine_.capitalObjectiveText(player->id));
+    }
+    if (engine_.mode() != winrisk::GameMode::SecretMission) {
         return {};
     }
     if (player->ai) {
@@ -481,17 +494,17 @@ BoardModel* AppController::boardModel() {
 bool AppController::startNewGame(int playerCount, int humanPlayers, int gameMode) {
     aiTimer_.stop();
     if (gameMode < static_cast<int>(winrisk::GameMode::Classic)
-        || gameMode > static_cast<int>(winrisk::GameMode::SecretMission)) {
-        status_ = "That game mode is not available yet";
+        || gameMode > static_cast<int>(winrisk::GameMode::Capital)) {
+        status_ = "Invalid game mode";
         refresh();
         return false;
     }
     const auto mode = static_cast<winrisk::GameMode>(gameMode);
     const auto seed = QRandomGenerator::global()->generate64();
     if (!engine_.startNewGame(playerCount, humanPlayers, seed, mode)) {
-        status_ = mode == winrisk::GameMode::SecretMission
-            ? "Secret Mission requires 3-5 players"
-            : "Invalid player configuration";
+        status_ = mode == winrisk::GameMode::Classic
+            ? "Classic requires 2-5 players"
+            : QString("%1 requires 3-5 players").arg(QString::fromStdString(winrisk::modeName(mode)));
         refresh();
         return false;
     }
@@ -511,6 +524,7 @@ void AppController::territoryTapped(int territoryId) {
         return;
     }
     const auto& clicked = engine_.territories()[static_cast<std::size_t>(territoryId)];
+
     if (engine_.phase() == winrisk::Phase::Reinforce) {
         if (engine_.reinforce(territoryId)) {
             status_ = QString("Reinforced %1").arg(QString::fromStdString(clicked.name));
@@ -520,6 +534,7 @@ void AppController::territoryTapped(int territoryId) {
         refresh();
         return;
     }
+
     if (engine_.phase() == winrisk::Phase::Attack) {
         if (selectedId_ < 0 || clicked.owner == engine_.currentPlayerId()) {
             if (clicked.owner == engine_.currentPlayerId() && clicked.armies >= 2) {
@@ -547,6 +562,7 @@ void AppController::territoryTapped(int territoryId) {
         refresh();
         return;
     }
+
     if (engine_.phase() == winrisk::Phase::Maneuver) {
         if (selectedId_ < 0) {
             if (clicked.owner == engine_.currentPlayerId() && clicked.armies >= 2) {
