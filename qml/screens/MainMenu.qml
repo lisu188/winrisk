@@ -44,7 +44,7 @@ Item {
                 ComboBox {
                     id: gameMode
                     Layout.fillWidth: true
-                    model: ["Classic", "Secret Mission"]
+                    model: ["Classic", "Secret Mission", "Capital"]
                     onCurrentIndexChanged: {
                         if (playerCount.value < playerCount.from)
                             playerCount.value = playerCount.from
@@ -55,7 +55,7 @@ Item {
                 SpinBox {
                     id: playerCount
                     Layout.fillWidth: true
-                    from: gameMode.currentIndex === 1 ? 3 : 2
+                    from: gameMode.currentIndex === 0 ? 2 : 3
                     to: 5
                     value: 4
                 }
@@ -71,8 +71,10 @@ Item {
 
                 Label {
                     Layout.fillWidth: true
-                    visible: gameMode.currentIndex === 1
-                    text: "Each player receives a hidden objective. First player to complete their mission wins."
+                    visible: gameMode.currentIndex !== 0
+                    text: gameMode.currentIndex === 1
+                          ? "Each player receives a hidden objective. First player to complete their mission wins."
+                          : "Each player has an original headquarters. Capture every HQ while retaining your own to win."
                     color: "#9aa7b4"
                     wrapMode: Text.Wrap
                 }
