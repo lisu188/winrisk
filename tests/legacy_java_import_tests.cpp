@@ -1,11 +1,11 @@
 #include "qt/LegacyJavaImporter.hpp"
+#include "JavaSketchTestSupport.hpp"
 
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
-#include <array>
 #include <iostream>
 #include <set>
 
@@ -24,22 +24,6 @@ void check(bool condition, const char* expression, int line) {
 
 #define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
 
-QString symbolFor(int id) {
-    if (id >= 42) return "WILD";
-    switch (id % 3) {
-        case 0: return "INFANTRY";
-        case 1: return "CAVALRY";
-        default: return "ARTILLERY";
-    }
-}
-
-QJsonObject card(int id) {
-    QJsonObject object;
-    object.insert("fieldIndex", id < 42 ? id : -1);
-    object.insert("symbol", symbolFor(id));
-    return object;
-}
-
 QJsonObject mission(const QString& kind, int a = 0, int b = 0) {
     QJsonObject object;
     object.insert("kind", kind);
@@ -50,24 +34,9 @@ QJsonObject mission(const QString& kind, int a = 0, int b = 0) {
     return object;
 }
 
-QJsonArray worldMapFields() {
-    QJsonArray fields;
-    const auto world = GameEngine::makeWorldTerritories();
-    for (int i = 0; i < static_cast<int>(world.size()); ++i) {
-        QJsonObject field;
-        field.insert("fieldIndex", i);
-        field.insert("displayName", QString::fromStdString(world[static_cast<std::size_t>(i)].name));
-        field.insert("cardSymbol", symbolFor(i));
-        fields.push_back(field);
-    }
-    return fields;
-}
-
 QJsonObject baseGame(const QString& mode) {
     QJsonObject root;
-    QJsonObject map;
-    map.insert("fields", worldMapFields());
-    root.insert("map", map);
+    root.insert("map", test::mapSketch("world"));
 
     QJsonObject params;
     params.insert("gameMode", mode);
@@ -81,7 +50,7 @@ QJsonObject baseGame(const QString& mode) {
     params.insert("humanPlayers", 1);
     params.insert("aiPlayers", 3);
     params.insert("randomSeed", 123456789);
-    params.insert("builtinMap", "world.map");
+    params.insert("builtinMap", "world");
     root.insert("params", params);
 
     QJsonArray owners;
@@ -102,27 +71,18 @@ QJsonObject baseGame(const QString& mode) {
 }
 
 QJsonObject player(int index, bool human) {
-    QJsonObject object;
-    object.insert("colorRgb", static_cast<double>(0xff000000u | static_cast<unsigned>(index * 0x00111111u)));
-    object.insert("neutral", false);
-    object.insert("reinforcements", index + 2);
-    object.insert("conqueredTerritoryThisTurn", index == 0);
-    object.insert("headquartersIndex", -1);
-    object.insert("interfaceClass", human
-        ? "com.winrisk.game.ai.HumanPlayer"
-        : "com.winrisk.game.ai.EasyAI");
-    object.insert("cards", QJsonArray{});
-    return object;
+    return test::basicPlayer(index, human);
 }
 
 void fillAllCards(QJsonObject& root, const std::set<int>& excluded, bool splitZones) {
+    constexpr int territoryCount = 42;
     QJsonArray players = root.value("players").toArray();
     std::set<int> assigned = excluded;
 
     if (splitZones) {
         QJsonArray hand0;
-        hand0.push_back(card(0));
-        hand0.push_back(card(42));
+        hand0.push_back(test::card(0, territoryCount));
+        hand0.push_back(test::card(42, territoryCount));
         QJsonObject p0 = players[0].toObject();
         p0.insert("cards", hand0);
         players[0] = p0;
@@ -133,21 +93,21 @@ void fillAllCards(QJsonObject& root, const std::set<int>& excluded, bool splitZo
 
     QJsonArray discard;
     if (splitZones && !assigned.contains(1)) {
-        discard.push_back(card(1));
+        discard.push_back(test::card(1, territoryCount));
         assigned.insert(1);
     }
     root.insert("discardPile", discard);
 
     QJsonArray draw;
-    for (int id = 0; id < 44; ++id) {
-        if (!assigned.contains(id)) draw.push_back(card(id));
+    for (int id = 0; id < territoryCount + 2; ++id) {
+        if (!assigned.contains(id)) draw.push_back(test::card(id, territoryCount));
     }
     root.insert("drawPile", draw);
 }
 
 bool import(const QJsonObject& root, Snapshot& snapshot, QString& error) {
     const QByteArray raw = QJsonDocument(root).toJson(QJsonDocument::Compact);
-    return winrisk::qt::importJavaGameSketch(root, raw, snapshot, error);
+    return qt::importJavaGameSketch(root, raw, snapshot, error);
 }
 
 }
@@ -166,6 +126,7 @@ int main(int argc, char** argv) {
     CHECK(import(classic, classicSnapshot, error));
     CHECK(error.isEmpty());
     CHECK(classicSnapshot.version == 6);
+    CHECK(classicSnapshot.mapId == "world");
     CHECK(classicSnapshot.mode == GameMode::Classic);
     CHECK(classicSnapshot.rules.incrementalCardSetValues);
     CHECK(classicSnapshot.rules.expandedManeuver);
