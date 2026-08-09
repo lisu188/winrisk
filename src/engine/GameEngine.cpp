@@ -103,13 +103,15 @@ GameEngine::GameEngine()
     : territories_(makeWorldTerritories()), continents_(makeWorldContinents()), random_(1) {
 }
 
-bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t seed) {
-    if (playerCount < 2 || playerCount > 5 || humanPlayers < 0 || humanPlayers > playerCount) {
+bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode) {
+    const int minimumPlayers = mode == GameMode::Classic ? 2 : 3;
+    if (mode == GameMode::Capital || playerCount < minimumPlayers || playerCount > 5 || humanPlayers < 0 || humanPlayers > playerCount) {
         return false;
     }
     territories_ = makeWorldTerritories();
     continents_ = makeWorldContinents();
     random_ = Random(seed);
+    mode_ = mode;
     phase_ = Phase::Reinforce;
     currentPlayer_ = 0;
     winner_ = -1;
@@ -120,10 +122,13 @@ bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t s
     maneuverSource_ = -1;
     maneuverTarget_ = -1;
     setupPlayers(playerCount, humanPlayers);
+    if (mode_ == GameMode::SecretMission) {
+        assignMissions();
+    }
     distributeTerritories();
     placeStartingTroops();
     initializeDeck();
-    currentPlayer_ = random_.uniform(playerCount);
+    currentPlayer_ = rollHighestPlayer();
     beginTurn();
     return true;
 }
@@ -500,6 +505,10 @@ const Player* GameEngine::currentPlayer() const {
     return &players_[static_cast<std::size_t>(currentPlayer_)];
 }
 
+GameMode GameEngine::mode() const {
+    return mode_;
+}
+
 Phase GameEngine::phase() const {
     return phase_;
 }
@@ -582,7 +591,8 @@ bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) cons
 
 Snapshot GameEngine::snapshot() const {
     Snapshot result;
-    result.version = 3;
+    result.version = 4;
+    result.mode = mode_;
     result.phase = phase_;
     result.currentPlayer = currentPlayer_;
     result.winner = winner_;
@@ -598,7 +608,11 @@ Snapshot GameEngine::snapshot() const {
 }
 
 bool GameEngine::restore(const Snapshot& snapshot) {
-    if ((snapshot.version != 2 && snapshot.version != 3) || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) {
+    if ((snapshot.version < 2 || snapshot.version > 4) || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) {
+        return false;
+    }
+    const GameMode restoredMode = snapshot.version >= 4 ? snapshot.mode : GameMode::Classic;
+    if (restoredMode == GameMode::Capital || (restoredMode == GameMode::SecretMission && snapshot.players.size() < 3)) {
         return false;
     }
     if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size())) {
@@ -615,7 +629,15 @@ bool GameEngine::restore(const Snapshot& snapshot) {
                 return false;
             }
         }
+        if (restoredMode == GameMode::SecretMission && !player.mission.has_value()) {
+            return false;
+        }
+        if (player.mission && player.mission->kind == MissionKind::Elimination
+            && (player.mission->eliminationTarget < 0 || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size()))) {
+            return false;
+        }
     }
+    mode_ = restoredMode;
     players_ = snapshot.players;
     territories_ = snapshot.territories;
     continents_ = makeWorldContinents();
@@ -688,6 +710,17 @@ void GameEngine::updateEliminationsAndWinner() {
             ++alive;
             candidate = player.id;
         }
+    }
+    if (mode_ == GameMode::SecretMission) {
+        for (const auto& player : players_) {
+            if (!player.eliminated && player.mission && missionCompleted(player.id, *player.mission)) {
+                winner_ = player.id;
+                phase_ = Phase::Finished;
+                return;
+            }
+        }
+        winner_ = -1;
+        return;
     }
     if (alive == 1) {
         winner_ = candidate;
