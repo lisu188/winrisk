@@ -16,6 +16,7 @@ add_library(winrisk_engine STATIC
     src/engine/GameEngine.cpp
     src/engine/MissionRules.cpp
     src/engine/CapitalRules.cpp
+    src/engine/TwoPlayerRules.cpp
 )
 
 target_include_directories(winrisk_engine PUBLIC src)
