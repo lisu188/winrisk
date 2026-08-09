@@ -1,4 +1,5 @@
 #include "qt/LegacyJavaImporter.hpp"
+#include "JavaSketchTestSupport.hpp"
 
 #include <QCoreApplication>
 #include <QJsonArray>
@@ -24,46 +25,21 @@ void check(bool condition, const char* expression, int line) {
 
 #define CHECK(expression) check(static_cast<bool>(expression), #expression, __LINE__)
 
-QString symbolFor(int id) {
-    if (id >= 42) return "WILD";
-    switch (id % 3) {
-        case 0: return "INFANTRY";
-        case 1: return "CAVALRY";
-        default: return "ARTILLERY";
-    }
-}
-
-QJsonObject card(int id) {
-    QJsonObject object;
-    object.insert("fieldIndex", id < 42 ? id : -1);
-    object.insert("symbol", symbolFor(id));
-    return object;
-}
-
 }
 
 int main(int argc, char** argv) {
     QCoreApplication app(argc, argv);
+    constexpr int territoryCount = 42;
 
     QJsonObject root;
-    QJsonObject map;
-    QJsonArray mapFields;
-    const auto world = GameEngine::makeWorldTerritories();
-    for (int i = 0; i < 42; ++i) {
-        QJsonObject field;
-        field.insert("fieldIndex", i);
-        field.insert("displayName", QString::fromStdString(world[static_cast<std::size_t>(i)].name));
-        field.insert("cardSymbol", symbolFor(i));
-        mapFields.push_back(field);
-    }
-    map.insert("fields", mapFields);
-    root.insert("map", map);
+    root.insert("map", test::mapSketch("world"));
 
     QJsonObject params;
     params.insert("gameMode", "CLASSIC");
     params.insert("humanPlayers", 0);
     params.insert("aiPlayers", 5);
     params.insert("randomSeed", -9223372036854770000.0);
+    params.insert("builtinMap", "world");
     root.insert("params", params);
 
     static const std::array<const char*, 5> classes = {
@@ -83,21 +59,15 @@ int main(int argc, char** argv) {
 
     QJsonArray players;
     for (int i = 0; i < 5; ++i) {
-        QJsonObject player;
-        player.insert("colorRgb", -16777216 + i * 1118481);
-        player.insert("neutral", false);
+        QJsonObject player = test::basicPlayer(i, false, false, classes[static_cast<std::size_t>(i)]);
         player.insert("reinforcements", 0);
-        player.insert("conqueredTerritoryThisTurn", false);
-        player.insert("headquartersIndex", -1);
-        player.insert("interfaceClass", classes[static_cast<std::size_t>(i)]);
-        player.insert("cards", QJsonArray{});
         players.push_back(player);
     }
     root.insert("players", players);
 
     QJsonArray owners;
     QJsonArray armies;
-    for (int i = 0; i < 42; ++i) {
+    for (int i = 0; i < territoryCount; ++i) {
         owners.push_back(i % 5);
         armies.push_back(2);
     }
@@ -109,10 +79,7 @@ int main(int argc, char** argv) {
     root.insert("maneuverUsed", false);
     root.insert("neutralPlayerIndex", -1);
     root.insert("tradeCount", 0);
-
-    QJsonArray draw;
-    for (int id = 0; id < 44; ++id) draw.push_back(card(id));
-    root.insert("drawPile", draw);
+    root.insert("drawPile", test::fullDrawPile(territoryCount));
     root.insert("discardPile", QJsonArray{});
 
     QByteArray raw = QJsonDocument(root).toJson(QJsonDocument::Compact);
@@ -131,8 +98,9 @@ int main(int argc, char** argv) {
 
     Snapshot snapshot;
     QString error;
-    CHECK(winrisk::qt::importJavaGameSketch(exactDocument.object(), raw, snapshot, error));
+    CHECK(qt::importJavaGameSketch(exactDocument.object(), raw, snapshot, error));
     CHECK(error.isEmpty());
+    CHECK(snapshot.mapId == "world");
     CHECK(snapshot.players.size() == 5);
     for (std::size_t i = 0; i < strategies.size(); ++i) {
         CHECK(snapshot.players[i].ai);
@@ -159,7 +127,7 @@ int main(int argc, char** argv) {
 
     Snapshot rejected;
     error.clear();
-    CHECK(!winrisk::qt::importJavaGameSketch(unsupportedRoot, unsupportedRaw, rejected, error));
+    CHECK(!qt::importJavaGameSketch(unsupportedRoot, unsupportedRaw, rejected, error));
     CHECK(error.contains("Unsupported Java AI class"));
 
     if (failures != 0) std::cerr << failures << " AI identity checks failed\n";
