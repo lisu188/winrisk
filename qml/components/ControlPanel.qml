@@ -8,7 +8,7 @@ Frame {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 10
+        spacing: 9
 
         RowLayout {
             Layout.fillWidth: true
@@ -44,12 +44,47 @@ Frame {
             color: "#d6e4ef"
         }
 
+        Frame {
+            Layout.fillWidth: true
+            padding: 8
+
+            RowLayout {
+                anchors.fill: parent
+                spacing: 8
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Label {
+                        text: "Cards: " + appController.cardCount
+                        font.bold: appController.mustTradeCards
+                        color: appController.mustTradeCards ? "#ffcf70" : "#d6e4ef"
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: appController.cardsText
+                        color: "#9aa7b4"
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Button {
+                    visible: appController.phaseText === "Reinforce" && appController.cardCount >= 3
+                    enabled: appController.canTradeCards
+                    text: "Trade +" + appController.nextTradeValue
+                    onClicked: appController.tradeCards()
+                }
+            }
+        }
+
         Label {
             Layout.fillWidth: true
             text: appController.phaseText === "Reinforce"
-                  ? "Tap your territory to add an army."
+                  ? (appController.mustTradeCards
+                     ? "Trade a card set, then place all reinforcements."
+                     : "Tap your territory to add an army.")
                   : appController.phaseText === "Attack"
-                    ? "Tap a source with 2+ armies, then an adjacent enemy."
+                    ? "Tap a source with 2+ armies, then an adjacent enemy. Capture at least one territory to earn a card."
                     : appController.phaseText === "Maneuver"
                       ? "Tap a source, then a connected friendly territory."
                       : "Game complete."
@@ -65,7 +100,7 @@ Frame {
 
         Label {
             Layout.fillWidth: true
-            Layout.minimumHeight: 54
+            Layout.minimumHeight: 46
             text: appController.status
             wrapMode: Text.Wrap
             color: "#e3e8ed"
