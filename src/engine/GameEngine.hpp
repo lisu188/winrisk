@@ -15,11 +15,32 @@ enum class Phase {
     Finished = 3
 };
 
+enum class GameMode {
+    Classic = 0,
+    SecretMission = 1,
+    Capital = 2
+};
+
 enum class CardType {
     Infantry = 0,
     Cavalry = 1,
     Artillery = 2,
     Wild = 3
+};
+
+enum class MissionKind {
+    Territory = 0,
+    FortifiedTerritory = 1,
+    Continents = 2,
+    Elimination = 3
+};
+
+struct MissionSpec {
+    MissionKind kind = MissionKind::Territory;
+    int territories = 0;
+    int minimumArmies = 0;
+    int continentCount = 0;
+    int eliminationTarget = -1;
 };
 
 struct Card {
@@ -54,6 +75,7 @@ struct Player {
     bool eliminated = false;
     int reinforcements = 0;
     std::vector<int> cards;
+    std::optional<MissionSpec> mission;
 };
 
 struct BattleResult {
@@ -66,7 +88,8 @@ struct BattleResult {
 };
 
 struct Snapshot {
-    int version = 3;
+    int version = 4;
+    GameMode mode = GameMode::Classic;
     Phase phase = Phase::Reinforce;
     int currentPlayer = 0;
     int winner = -1;
@@ -96,7 +119,7 @@ class GameEngine {
 public:
     GameEngine();
 
-    bool startNewGame(int playerCount, int humanPlayers, std::uint64_t seed);
+    bool startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode = GameMode::Classic);
     bool reinforce(int territoryId, int count = 1);
     BattleResult attack(int sourceId, int targetId);
     bool maneuver(int sourceId, int targetId, int troops = 1);
@@ -110,6 +133,7 @@ public:
     const std::vector<Card>& deck() const;
     const std::vector<Card>& discard() const;
     const Player* currentPlayer() const;
+    GameMode mode() const;
     Phase phase() const;
     int currentPlayerId() const;
     int winnerId() const;
@@ -119,6 +143,7 @@ public:
     bool canTradeCards() const;
     bool mustTradeCards() const;
     bool running() const;
+    std::string missionText(int playerId) const;
 
     bool canAttack(int sourceId, int targetId) const;
     bool canManeuver(int sourceId, int targetId) const;
@@ -130,6 +155,8 @@ public:
     static std::vector<Territory> makeWorldTerritories();
     static std::vector<Continent> makeWorldContinents();
     static std::vector<Card> makeRiskDeck();
+    static std::vector<MissionSpec> makeMissionDeck(int playerCount);
+    static std::string missionDescription(const MissionSpec& mission);
     static int startingTroops(int playerCount);
     static int tradeValue(int completedTrades);
 
@@ -140,6 +167,7 @@ private:
     std::vector<Card> deck_;
     std::vector<Card> discard_;
     Random random_;
+    GameMode mode_ = GameMode::Classic;
     Phase phase_ = Phase::Finished;
     int currentPlayer_ = 0;
     int winner_ = -1;
@@ -151,6 +179,8 @@ private:
     int maneuverTarget_ = -1;
 
     void setupPlayers(int playerCount, int humanPlayers);
+    void assignMissions();
+    int rollHighestPlayer();
     void distributeTerritories();
     void placeStartingTroops();
     void initializeDeck();
@@ -163,6 +193,7 @@ private:
     void beginTurn();
     void advancePlayer();
     void updateEliminationsAndWinner();
+    bool missionCompleted(int playerId, const MissionSpec& mission) const;
     int reinforcementCount(int playerId) const;
     int territoryCount(int playerId) const;
     bool ownsContinent(int playerId, const Continent& continent) const;
@@ -175,6 +206,7 @@ private:
 };
 
 std::string phaseName(Phase phase);
+std::string modeName(GameMode mode);
 std::string cardTypeName(CardType type);
 
 }
