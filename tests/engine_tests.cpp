@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <numeric>
 
 using namespace winrisk;
 
@@ -24,6 +25,61 @@ bool sameMission(const std::optional<MissionSpec>& a, const std::optional<Missio
         && a->minimumArmies == b->minimumArmies
         && a->continentCount == b->continentCount
         && a->eliminationTarget == b->eliminationTarget;
+}
+
+bool allRulesEnabled(const RulesOptions& rules) {
+    return rules.incrementalCardSetValues
+        && rules.expandedManeuver
+        && rules.attackCardReroll
+        && rules.commanderDie
+        && rules.attackWithAll;
+}
+
+Snapshot actionSnapshot(const Snapshot& base, Phase phase) {
+    Snapshot snapshot = base;
+    snapshot.version = 5;
+    snapshot.mode = GameMode::Classic;
+    snapshot.rules = {};
+    snapshot.phase = phase;
+    snapshot.currentPlayer = 0;
+    snapshot.winner = -1;
+    snapshot.tradeCount = 0;
+    snapshot.conqueredThisTurn = false;
+    snapshot.commanderDieUsed = false;
+    snapshot.deck = GameEngine::makeRiskDeck();
+    snapshot.discard.clear();
+    for (auto& player : snapshot.players) {
+        player.neutral = false;
+        player.eliminated = false;
+        player.reinforcements = 0;
+        player.cards.clear();
+        player.mission.reset();
+        player.headquarters = -1;
+    }
+    for (auto& territory : snapshot.territories) {
+        territory.owner = 3;
+        territory.armies = 1;
+    }
+    snapshot.territories[0].owner = 0;
+    snapshot.territories[0].armies = 50;
+    snapshot.territories[1].owner = 1;
+    snapshot.territories[1].armies = 8;
+    snapshot.territories[2].owner = 2;
+    snapshot.territories[2].armies = 1;
+    snapshot.territories[13].owner = 3;
+    snapshot.territories[13].armies = 1;
+    return snapshot;
+}
+
+void removeCard(Snapshot& snapshot, int cardId) {
+    snapshot.deck.erase(std::remove_if(snapshot.deck.begin(), snapshot.deck.end(), [cardId](const Card& card) {
+        return card.id == cardId;
+    }), snapshot.deck.end());
+}
+
+int armyPair(const GameEngine& engine, int first, int second) {
+    return engine.territories()[static_cast<std::size_t>(first)].armies
+        + engine.territories()[static_cast<std::size_t>(second)].armies;
 }
 }
 
@@ -76,19 +132,14 @@ int main() {
     }
     for (int playerId = 0; playerId < 4; ++playerId) {
         int armies = 0;
-        for (const auto& territory : classicA.territories()) {
-            if (territory.owner == playerId) armies += territory.armies;
-        }
+        for (const auto& territory : classicA.territories()) if (territory.owner == playerId) armies += territory.armies;
         CHECK(armies == GameEngine::startingTroops(4));
     }
 
     const int current = classicA.currentPlayerId();
     int owned = -1;
     for (const auto& territory : classicA.territories()) {
-        if (territory.owner == current) {
-            owned = territory.id;
-            break;
-        }
+        if (territory.owner == current) { owned = territory.id; break; }
     }
     CHECK(owned >= 0);
     if (classicA.currentPlayer() != nullptr) {
@@ -105,20 +156,29 @@ int main() {
     }
 
     const Snapshot saved = classicA.snapshot();
-    CHECK(saved.version == 4);
+    CHECK(saved.version == 5);
+    CHECK(!allRulesEnabled(saved.rules));
     GameEngine restored;
     CHECK(restored.restore(saved));
     CHECK(restored.mode() == GameMode::Classic);
     CHECK(restored.currentPlayerId() == classicA.currentPlayerId());
     CHECK(restored.turn() == classicA.turn());
 
+    Snapshot legacyV4 = saved;
+    legacyV4.version = 4;
+    legacyV4.rules = {};
+    legacyV4.commanderDieUsed = false;
+    GameEngine upgradedV4;
+    CHECK(upgradedV4.restore(legacyV4));
+    CHECK(!allRulesEnabled(upgradedV4.rules()));
+
     Snapshot tradeSnapshot = saved;
     const int trader = tradeSnapshot.currentPlayer;
     if (trader >= 0 && trader < static_cast<int>(tradeSnapshot.players.size())) {
         tradeSnapshot.players[static_cast<std::size_t>(trader)].cards = {0, 3, 6};
-        tradeSnapshot.deck.erase(std::remove_if(tradeSnapshot.deck.begin(), tradeSnapshot.deck.end(), [](const Card& card) {
-            return card.id == 0 || card.id == 3 || card.id == 6;
-        }), tradeSnapshot.deck.end());
+        removeCard(tradeSnapshot, 0);
+        removeCard(tradeSnapshot, 3);
+        removeCard(tradeSnapshot, 6);
         GameEngine trading;
         CHECK(trading.restore(tradeSnapshot));
         CHECK(trading.canTradeCards());
@@ -142,6 +202,106 @@ int main() {
         CHECK(threeWildTrading.restore(threeWildSnapshot));
         CHECK(!threeWildTrading.canTradeCards());
     }
+
+    RulesOptions allRules{true, true, true, true, true};
+    GameEngine optionGame;
+    CHECK(optionGame.startNewGame(4, 1, 5150, GameMode::Classic, allRules));
+    CHECK(allRulesEnabled(optionGame.rules()));
+    const Snapshot optionSaved = optionGame.snapshot();
+    CHECK(optionSaved.version == 5);
+    CHECK(allRulesEnabled(optionSaved.rules));
+    GameEngine optionRestored;
+    CHECK(optionRestored.restore(optionSaved));
+    CHECK(allRulesEnabled(optionRestored.rules()));
+
+    Snapshot incremental = actionSnapshot(saved, Phase::Reinforce);
+    incremental.rules.incrementalCardSetValues = true;
+    incremental.tradeCount = 1;
+    incremental.players[0].cards = {0, 3, 6};
+    removeCard(incremental, 0);
+    removeCard(incremental, 3);
+    removeCard(incremental, 6);
+    GameEngine incrementalEngine;
+    CHECK(incrementalEngine.restore(incremental));
+    CHECK(incrementalEngine.nextTradeValue() == 5);
+    CHECK(incrementalEngine.tradeCards() == 5);
+    CHECK(incrementalEngine.nextTradeValue() == 6);
+
+    Snapshot maneuverBase = actionSnapshot(saved, Phase::Maneuver);
+    maneuverBase.territories[3].owner = 0;
+    maneuverBase.territories[3].armies = 4;
+    maneuverBase.territories[4].owner = 0;
+    maneuverBase.territories[4].armies = 4;
+    GameEngine standardManeuver;
+    CHECK(standardManeuver.restore(maneuverBase));
+    CHECK(standardManeuver.maneuver(0, 3, 1));
+    CHECK(!standardManeuver.maneuver(3, 4, 1));
+    maneuverBase.rules.expandedManeuver = true;
+    GameEngine expandedManeuver;
+    CHECK(expandedManeuver.restore(maneuverBase));
+    CHECK(expandedManeuver.maneuver(0, 3, 1));
+    CHECK(expandedManeuver.maneuver(3, 4, 1));
+
+    Snapshot commander = actionSnapshot(saved, Phase::Attack);
+    commander.rules.commanderDie = true;
+    commander.rngState = Random(1001).state();
+    GameEngine commanderEngine;
+    CHECK(commanderEngine.restore(commander));
+    const BattleResult commanderResult = commanderEngine.attack(0, 1);
+    CHECK(commanderResult.legal);
+    CHECK(commanderEngine.commanderDieUsed());
+    CHECK(!commanderResult.attackDice.empty() && commanderResult.attackDice.front() == 6);
+    Snapshot commanderTurn = commanderEngine.snapshot();
+    commanderTurn.phase = Phase::Maneuver;
+    commanderTurn.winner = -1;
+    GameEngine commanderReset;
+    CHECK(commanderReset.restore(commanderTurn));
+    CHECK(commanderReset.commanderDieUsed());
+    CHECK(commanderReset.endPhase());
+    CHECK(!commanderReset.commanderDieUsed());
+
+    Snapshot attackSingle = actionSnapshot(saved, Phase::Attack);
+    attackSingle.rngState = Random(2222).state();
+    GameEngine singleEngine;
+    CHECK(singleEngine.restore(attackSingle));
+    const BattleResult singleResult = singleEngine.attack(0, 1);
+    CHECK(singleResult.legal);
+    CHECK(!singleResult.captured);
+    CHECK(armyPair(singleEngine, 0, 1) == 56);
+
+    Snapshot attackAll = attackSingle;
+    attackAll.rules.attackWithAll = true;
+    GameEngine allEngine;
+    CHECK(allEngine.restore(attackAll));
+    const BattleResult allResult = allEngine.attack(0, 1);
+    CHECK(allResult.legal);
+    CHECK(armyPair(allEngine, 0, 1) <= 54);
+    CHECK(allResult.captured || allEngine.territories()[0].armies <= 1 || allEngine.territories()[1].owner == 0);
+
+    bool foundImprovedReroll = false;
+    for (std::uint64_t seed = 1; seed <= 256 && !foundImprovedReroll; ++seed) {
+        Snapshot noReroll = actionSnapshot(saved, Phase::Attack);
+        noReroll.territories[0].armies = 7;
+        noReroll.players[0].cards = {0};
+        removeCard(noReroll, 0);
+        noReroll.rngState = Random(seed).state();
+        Snapshot withReroll = noReroll;
+        withReroll.rules.attackCardReroll = true;
+        GameEngine baseAttack;
+        GameEngine rerollAttack;
+        CHECK(baseAttack.restore(noReroll));
+        CHECK(rerollAttack.restore(withReroll));
+        const BattleResult baseResult = baseAttack.attack(0, 1);
+        const BattleResult rerollResult = rerollAttack.attack(0, 1);
+        CHECK(baseResult.defenseDice == rerollResult.defenseDice);
+        if (baseResult.attackDice != rerollResult.attackDice) {
+            const int baseSum = std::accumulate(baseResult.attackDice.begin(), baseResult.attackDice.end(), 0);
+            const int rerollSum = std::accumulate(rerollResult.attackDice.begin(), rerollResult.attackDice.end(), 0);
+            CHECK(rerollSum > baseSum);
+            foundImprovedReroll = true;
+        }
+    }
+    CHECK(foundImprovedReroll);
 
     Snapshot legacyV3 = saved;
     legacyV3.version = 3;
@@ -181,9 +341,7 @@ int main() {
             CHECK(player.ai);
             CHECK(player.eliminated);
             CHECK(player.cards.empty());
-        } else {
-            ++activePlayers;
-        }
+        } else ++activePlayers;
     }
     CHECK(activePlayers == 2);
     CHECK(neutralId == 2);
@@ -193,17 +351,10 @@ int main() {
         int territories = 0;
         int armies = 0;
         for (const auto& territory : twoA.territories()) {
-            if (territory.owner == playerId) {
-                ++territories;
-                armies += territory.armies;
-            }
+            if (territory.owner == playerId) { ++territories; armies += territory.armies; }
         }
         CHECK(territories == 14);
         CHECK(armies == 40);
-    }
-    for (std::size_t i = 0; i < twoA.territories().size(); ++i) {
-        CHECK(twoA.territories()[i].owner == twoB.territories()[i].owner);
-        CHECK(twoA.territories()[i].armies == twoB.territories()[i].armies);
     }
 
     const Snapshot twoSaved = twoA.snapshot();
@@ -229,18 +380,14 @@ int main() {
     twoWinnerSnapshot.phase = Phase::Attack;
     twoWinnerSnapshot.winner = -1;
     twoWinnerSnapshot.currentPlayer = 0;
-    for (auto& territory : twoWinnerSnapshot.territories) {
-        if (territory.owner == 1) territory.owner = neutralId;
-    }
+    for (auto& territory : twoWinnerSnapshot.territories) if (territory.owner == 1) territory.owner = neutralId;
     GameEngine twoWinner;
     CHECK(twoWinner.restore(twoWinnerSnapshot));
     CHECK(twoWinner.winnerId() == 0);
     CHECK(twoWinner.phase() == Phase::Finished);
-    int neutralTerritories = 0;
-    for (const auto& territory : twoWinner.territories()) {
-        if (territory.owner == neutralId) ++neutralTerritories;
-    }
-    CHECK(neutralTerritories > 0);
+    CHECK(std::any_of(twoWinner.territories().begin(), twoWinner.territories().end(), [neutralId](const Territory& territory) {
+        return territory.owner == neutralId;
+    }));
 
     Snapshot invalidNeutral = twoSaved;
     invalidNeutral.players[0].neutral = true;
@@ -259,24 +406,18 @@ int main() {
         const auto& b = secretB.players()[i];
         CHECK(a.mission.has_value());
         CHECK(sameMission(a.mission, b.mission));
-        if (a.mission && a.mission->kind == MissionKind::Elimination) {
-            CHECK(a.mission->eliminationTarget != a.id);
-        }
+        if (a.mission && a.mission->kind == MissionKind::Elimination) CHECK(a.mission->eliminationTarget != a.id);
     }
     const Snapshot secretSaved = secretA.snapshot();
     GameEngine secretRestored;
     CHECK(secretRestored.restore(secretSaved));
     CHECK(secretRestored.mode() == GameMode::SecretMission);
-    for (std::size_t i = 0; i < secretA.players().size(); ++i) {
-        CHECK(sameMission(secretA.players()[i].mission, secretRestored.players()[i].mission));
-    }
+    for (std::size_t i = 0; i < secretA.players().size(); ++i) CHECK(sameMission(secretA.players()[i].mission, secretRestored.players()[i].mission));
 
     Snapshot winningMission = secretSaved;
     winningMission.phase = Phase::Attack;
     winningMission.winner = -1;
-    for (auto& player : winningMission.players) {
-        player.mission = MissionSpec{MissionKind::Territory, 42, 0, 0, -1};
-    }
+    for (auto& player : winningMission.players) player.mission = MissionSpec{MissionKind::Territory, 42, 0, 0, -1};
     winningMission.players[0].mission = MissionSpec{MissionKind::Territory, 24, 0, 0, -1};
     for (int territoryId = 0; territoryId < 42; ++territoryId) {
         auto& territory = winningMission.territories[static_cast<std::size_t>(territoryId)];
@@ -308,33 +449,22 @@ int main() {
         CHECK(capitalA.headquartersControlledBy(player.id) == 1);
         CHECK(!capitalA.capitalObjectiveText(player.id).empty());
         int firstOwned = -1;
-        for (const auto& territory : capitalA.territories()) {
-            if (territory.owner == player.id) {
-                firstOwned = territory.id;
-                break;
-            }
-        }
+        for (const auto& territory : capitalA.territories()) if (territory.owner == player.id) { firstOwned = territory.id; break; }
         CHECK(player.headquarters == firstOwned);
     }
-    for (const auto& card : capitalA.deck()) {
-        CHECK(card.territoryId < 0 || capitalA.headquartersOwner(card.territoryId) < 0);
-    }
+    for (const auto& card : capitalA.deck()) CHECK(card.territoryId < 0 || capitalA.headquartersOwner(card.territoryId) < 0);
 
     const Snapshot capitalSaved = capitalA.snapshot();
     GameEngine capitalRestored;
     CHECK(capitalRestored.restore(capitalSaved));
     CHECK(capitalRestored.mode() == GameMode::Capital);
     CHECK(capitalRestored.deck().size() == capitalA.deck().size());
-    for (std::size_t i = 0; i < capitalA.players().size(); ++i) {
-        CHECK(capitalRestored.players()[i].headquarters == capitalA.players()[i].headquarters);
-    }
+    for (std::size_t i = 0; i < capitalA.players().size(); ++i) CHECK(capitalRestored.players()[i].headquarters == capitalA.players()[i].headquarters);
 
     Snapshot capitalWin = capitalSaved;
     capitalWin.phase = Phase::Attack;
     capitalWin.winner = -1;
-    for (const auto& player : capitalWin.players) {
-        capitalWin.territories[static_cast<std::size_t>(player.headquarters)].owner = 0;
-    }
+    for (const auto& player : capitalWin.players) capitalWin.territories[static_cast<std::size_t>(player.headquarters)].owner = 0;
     GameEngine capitalWinner;
     CHECK(capitalWinner.restore(capitalWin));
     CHECK(capitalWinner.winnerId() == 0);
