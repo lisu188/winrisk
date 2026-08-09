@@ -8,6 +8,7 @@ on:
     paths:
       - 'src/engine/**'
       - 'tests/engine_tests_v6.cpp'
+      - 'tests/ai_strategy_tests.cpp'
       - '.github/workflows/engine-v6.yml'
   pull_request:
     branches:
@@ -15,6 +16,7 @@ on:
     paths:
       - 'src/engine/**'
       - 'tests/engine_tests_v6.cpp'
+      - 'tests/ai_strategy_tests.cpp'
       - '.github/workflows/engine-v6.yml'
   workflow_dispatch:
 
@@ -34,8 +36,28 @@ jobs:
           src/engine/CapitalRules.cpp
           src/engine/TwoPlayerRules.cpp
           src/engine/CombatRules.cpp
+          src/engine/AiIdentity.cpp
+          src/engine/AiStrategies.cpp
           tests/engine_tests_v6.cpp
           -o winrisk_engine_tests
 
       - name: Run engine tests
         run: ./winrisk_engine_tests
+
+      - name: Build strict Java AI strategy tests
+        run: >-
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror
+          -Isrc
+          src/engine/GameEngineCore.cpp
+          src/engine/WorldMap.cpp
+          src/engine/MissionRules.cpp
+          src/engine/CapitalRules.cpp
+          src/engine/TwoPlayerRules.cpp
+          src/engine/CombatRules.cpp
+          src/engine/AiIdentity.cpp
+          src/engine/AiStrategies.cpp
+          tests/ai_strategy_tests.cpp
+          -o winrisk_ai_strategy_tests
+
+      - name: Run Java AI strategy tests
+        run: ./winrisk_ai_strategy_tests
