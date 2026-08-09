@@ -45,6 +45,11 @@ class AppController final : public QObject {
     Q_PROPERTY(QString currentPlayerText READ currentPlayerText NOTIFY stateChanged)
     Q_PROPERTY(QColor currentPlayerColor READ currentPlayerColor NOTIFY stateChanged)
     Q_PROPERTY(int reinforcements READ reinforcements NOTIFY stateChanged)
+    Q_PROPERTY(int cardCount READ cardCount NOTIFY stateChanged)
+    Q_PROPERTY(QString cardsText READ cardsText NOTIFY stateChanged)
+    Q_PROPERTY(bool canTradeCards READ canTradeCards NOTIFY stateChanged)
+    Q_PROPERTY(bool mustTradeCards READ mustTradeCards NOTIFY stateChanged)
+    Q_PROPERTY(int nextTradeValue READ nextTradeValue NOTIFY stateChanged)
     Q_PROPERTY(qulonglong turn READ turn NOTIFY stateChanged)
     Q_PROPERTY(QString status READ status NOTIFY stateChanged)
     Q_PROPERTY(QString winnerText READ winnerText NOTIFY stateChanged)
@@ -58,6 +63,11 @@ public:
     QString currentPlayerText() const;
     QColor currentPlayerColor() const;
     int reinforcements() const;
+    int cardCount() const;
+    QString cardsText() const;
+    bool canTradeCards() const;
+    bool mustTradeCards() const;
+    int nextTradeValue() const;
     qulonglong turn() const;
     QString status() const;
     QString winnerText() const;
@@ -65,6 +75,7 @@ public:
 
     Q_INVOKABLE bool startNewGame(int playerCount, int humanPlayers);
     Q_INVOKABLE void territoryTapped(int territoryId);
+    Q_INVOKABLE bool tradeCards();
     Q_INVOKABLE bool endPhase();
     Q_INVOKABLE bool quickSave();
     Q_INVOKABLE bool quickLoad();
