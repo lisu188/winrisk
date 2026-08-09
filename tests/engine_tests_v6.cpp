@@ -40,7 +40,8 @@ bool allRulesEnabled(const RulesOptions& rules) {
         && rules.attackCardReroll
         && rules.commanderDie
         && rules.attackWithAll
-        && rules.fogOfWar;
+        && rules.fogOfWar
+        && rules.skynet;
 }
 
 void removeCard(Snapshot& snapshot, int cardId) {
@@ -144,9 +145,7 @@ int main() {
     for (int playerId = 0; playerId < 4; ++playerId) {
         int armies = 0;
         for (const auto& territory : classicA.territories()) {
-            if (territory.owner == playerId) {
-                armies += territory.armies;
-            }
+            if (territory.owner == playerId) armies += territory.armies;
         }
         CHECK(armies == GameEngine::startingTroops(4));
     }
@@ -154,16 +153,19 @@ int main() {
     const Snapshot classicSaved = classicA.snapshot();
     CHECK(classicSaved.version == 6);
     CHECK(!classicSaved.rules.fogOfWar);
+    CHECK(!classicSaved.rules.skynet);
     GameEngine classicRestored;
     CHECK(classicRestored.restore(classicSaved));
     CHECK(classicRestored.currentPlayerId() == classicA.currentPlayerId());
 
     Snapshot legacyV5 = classicSaved;
     legacyV5.version = 5;
-    legacyV5.rules.fogOfWar = false;
+    legacyV5.rules.fogOfWar = true;
+    legacyV5.rules.skynet = true;
     GameEngine upgradedV5;
     CHECK(upgradedV5.restore(legacyV5));
     CHECK(!upgradedV5.rules().fogOfWar);
+    CHECK(!upgradedV5.rules().skynet);
 
     RulesOptions everyRule;
     everyRule.incrementalCardSetValues = true;
@@ -172,6 +174,7 @@ int main() {
     everyRule.commanderDie = true;
     everyRule.attackWithAll = true;
     everyRule.fogOfWar = true;
+    everyRule.skynet = true;
 
     GameEngine optionGame;
     CHECK(optionGame.startNewGame(4, 1, 5150, GameMode::Classic, everyRule));
@@ -283,6 +286,43 @@ int main() {
         }
     }
     CHECK(foundRerollChange);
+
+    Snapshot normalAi = actionSnapshot(classicSaved, Phase::Attack);
+    normalAi.currentPlayer = 2;
+    normalAi.territories[0].owner = 2;
+    normalAi.territories[0].armies = 20;
+    normalAi.territories[1].owner = 0;
+    normalAi.territories[1].armies = 15;
+    normalAi.territories[5].owner = 3;
+    normalAi.territories[5].armies = 1;
+    normalAi.territories[29].owner = 2;
+    normalAi.territories[29].armies = 2;
+    normalAi.rngState = Random(9191).state();
+
+    Snapshot skynetAi = normalAi;
+    skynetAi.rules.skynet = true;
+
+    GameEngine normalAiEngine;
+    GameEngine skynetAiEngine;
+    CHECK(normalAiEngine.restore(normalAi));
+    CHECK(skynetAiEngine.restore(skynetAi));
+    CHECK(normalAiEngine.currentPlayer() != nullptr && normalAiEngine.currentPlayer()->ai);
+    CHECK(skynetAiEngine.currentPlayer() != nullptr && skynetAiEngine.currentPlayer()->ai);
+
+    const int normalHumanBefore = normalAiEngine.territories()[1].armies;
+    const int normalAiBefore = normalAiEngine.territories()[5].armies;
+    CHECK(normalAiEngine.aiStep());
+    CHECK(normalAiEngine.territories()[1].armies == normalHumanBefore);
+    CHECK(normalAiEngine.territories()[5].armies != normalAiBefore
+        || normalAiEngine.territories()[5].owner == 2);
+
+    const int skynetHumanBefore = skynetAiEngine.territories()[1].armies;
+    const int skynetAiBefore = skynetAiEngine.territories()[5].armies;
+    CHECK(skynetAiEngine.aiStep());
+    CHECK(skynetAiEngine.territories()[1].armies != skynetHumanBefore
+        || skynetAiEngine.territories()[1].owner == 2);
+    CHECK(skynetAiEngine.territories()[5].armies == skynetAiBefore);
+    CHECK(skynetAiEngine.territories()[5].owner == 3);
 
     GameEngine twoPlayer;
     CHECK(twoPlayer.startNewGame(2, 1, 777, GameMode::Classic));
