@@ -44,6 +44,7 @@ Item {
                 required property int armies
                 required property int ownerId
                 required property color ownerColor
+                required property int headquartersOwnerId
                 required property bool selected
 
                 width: Math.max(34, Math.min(48, boardSurface.width / 22))
@@ -73,6 +74,28 @@ Item {
                     }
                 }
 
+                Rectangle {
+                    visible: territory.headquartersOwnerId >= 0
+                    width: Math.max(19, territory.width * 0.48)
+                    height: width
+                    radius: width / 2
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: -width * 0.28
+                    anchors.topMargin: -height * 0.28
+                    color: "#f2c94c"
+                    border.color: "#5a4610"
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "HQ"
+                        color: "#271f08"
+                        font.pixelSize: Math.max(8, parent.width * 0.42)
+                        font.bold: true
+                    }
+                }
+
                 TapHandler {
                     id: tapHandler
                     onTapped: appController.territoryTapped(territory.territoryId)
@@ -81,6 +104,7 @@ Item {
                 HoverHandler { id: hover }
                 ToolTip.visible: hover.hovered
                 ToolTip.text: territory.territoryName + " — " + territory.armies
+                              + (territory.headquartersOwnerId >= 0 ? " — HQ" : "")
                 ToolTip.delay: 350
             }
         }
