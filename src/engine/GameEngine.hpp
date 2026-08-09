@@ -27,6 +27,8 @@ struct RulesOptions {
     bool attackCardReroll = false;
     bool commanderDie = false;
     bool attackWithAll = false;
+    bool fogOfWar = false;
+    bool skynet = false;
 };
 
 struct Card { int id = -1; CardType type = CardType::Infantry; int territoryId = -1; };
@@ -67,7 +69,7 @@ struct BattleResult {
 };
 
 struct Snapshot {
-    int version = 5;
+    int version = 6;
     GameMode mode = GameMode::Classic;
     RulesOptions rules;
     Phase phase = Phase::Reinforce;
