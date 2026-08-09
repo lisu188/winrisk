@@ -10,6 +10,8 @@ The `qt-cpp` implementation already contains:
 - standard 42-territory world topology and continent bonuses
 - deterministic xoshiro-family RNG with serialized state
 - Classic mode for 2–5 players
+- official two-player Classic setup with a non-turn-taking Neutral cluster: 14 territories and 40 initial armies per cluster
+- Neutral excluded from starting-player rolls, turns and Classic victory counts while remaining attackable/defensible territory ownership
 - Secret Mission mode for 3–5 players with the Java mission deck semantics
 - Capital mode for 3–5 players with original-HQ victory semantics
 - Java-compatible highest-die starting player and map-order claim setup for 3–5 player Classic/Capital games
@@ -27,9 +29,9 @@ The `qt-cpp` implementation already contains:
 - Qt `QAbstractListModel` presentation layer
 - responsive Qt Quick desktop/tablet/phone UI with mode selection, mission/objective HUD and HQ badges
 - native quick-save/load using versioned JSON schema v4
-- schema-v4 persistence of mode, missions and original headquarters
+- schema-v4 persistence of mode, missions, original headquarters and Neutral state
 - migration of native schema-v2/v3 saves to v4
-- import of current Java JSON saves for standard-map Classic games without neutral armies
+- import of current Java JSON saves for standard-map Classic games, including two-player Neutral ownership
 - CTest engine tests that run in Debug and Release builds
 - native CI targets for Windows, Linux, macOS, Android, iOS and WebAssembly
 
@@ -85,21 +87,20 @@ Pure C++ GameEngine
 
 The engine is command-driven and does not expose mutable state to QML. UI taps call engine operations such as reinforcement, card trading, attack, maneuver and phase progression. AI uses the same engine operations and is scheduled asynchronously from Qt so the UI thread is never blocked by a nested event loop.
 
-Game modes, missions and Capital headquarters are pure C++ state and are serialized as explicit value types rather than QML state.
+Game modes, missions, Capital headquarters and two-player Neutral ownership are pure C++ state and are serialized as explicit value types rather than QML state.
 
 ## Persistence
 
-New saves use JSON schema version 4 and contain the game mode, stable player/territory/card IDs, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
+New saves use JSON schema version 4 and contain the game mode, stable player/territory/card IDs, Neutral flags, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression and the complete RNG state. They do not serialize C++ object layouts or pointers.
 
 Native schema-v2 and schema-v3 saves remain loadable as Classic games. Schema-v2 saves reconstruct the deterministic card system while preserving their stored gameplay RNG state.
 
-The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map. Java Capital/Secret Mission saves, two-player neutral-army saves, historical/custom maps and remaining optional-rule state are deliberately rejected until those formats are migrated rather than silently loading them incorrectly. Java card hands are not yet imported from legacy saves.
+The loader can also recognize the current Java Gson `GameSketch` JSON representation for Classic games on the standard 42-territory world map, including Java two-player Neutral saves. Java Capital/Secret Mission saves, historical/custom maps and remaining optional-rule state are deliberately rejected until those formats are migrated rather than silently loading them incorrectly. Java card hands are not yet imported from legacy saves.
 
 ## Remaining Java parity work
 
 The C++ milestone is playable but does not yet cover every feature of the Java version. Remaining migration work includes:
 
-- official two-player neutral-army setup and neutral defense ownership
 - fog of war and remaining optional rules
 - historical and procedural maps
 - full Java save parity for Secret Mission/Capital, legacy cards and old Java ObjectStream saves
