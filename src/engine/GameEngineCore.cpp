@@ -50,13 +50,30 @@ void Random::setState(const std::array<std::uint64_t, 4>& state) {
     state_ = allZero ? Random(1).state() : state;
 }
 
-GameEngine::GameEngine() : territories_(makeWorldTerritories()), continents_(makeWorldContinents()), random_(1) {}
+GameEngine::GameEngine()
+    : territories_(makeWorldTerritories()),
+      continents_(makeWorldContinents()),
+      cardCatalog_(makeRiskDeck(42)),
+      random_(1) {}
 
-bool GameEngine::startNewGame(int playerCount, int humanPlayers, std::uint64_t seed, GameMode mode, RulesOptions rules) {
+bool GameEngine::startNewGame(
+    int playerCount,
+    int humanPlayers,
+    std::uint64_t seed,
+    GameMode mode,
+    RulesOptions rules,
+    const std::string& mapId
+) {
     const bool knownMode = mode == GameMode::Classic || mode == GameMode::SecretMission || mode == GameMode::Capital;
     const int minimumPlayers = mode == GameMode::Classic ? 2 : 3;
-    if (!knownMode || playerCount < minimumPlayers || playerCount > 5 || humanPlayers < 0 || humanPlayers > playerCount) return false;
-    territories_ = makeWorldTerritories(); continents_ = makeWorldContinents(); random_ = Random(seed); mode_ = mode; rules_ = rules;
+    const auto definition = makeBuiltinMap(mapId);
+    if (!knownMode || playerCount < minimumPlayers || playerCount > 5 || humanPlayers < 0 || humanPlayers > playerCount || !definition) return false;
+
+    territories_ = definition->territories;
+    continents_ = definition->continents;
+    mapId_ = definition->id;
+    cardCatalog_ = makeRiskDeck(static_cast<int>(territories_.size()));
+    random_ = Random(seed); mode_ = mode; rules_ = rules;
     phase_ = Phase::Reinforce; currentPlayer_ = 0; winner_ = -1; turn_ = 1; tradeCount_ = 0; conqueredThisTurn_ = false;
     commanderDieUsed_ = false; maneuverUsed_ = false; maneuverSource_ = -1; maneuverTarget_ = -1;
     setupPlayers(playerCount, humanPlayers);
@@ -109,7 +126,12 @@ void GameEngine::placeStartingTroops() {
     }
 }
 
-void GameEngine::initializeDeck() { deck_ = makeRiskDeck(); discard_.clear(); shuffleCards(deck_); }
+void GameEngine::initializeDeck() {
+    cardCatalog_ = makeRiskDeck(static_cast<int>(territories_.size()));
+    deck_ = cardCatalog_;
+    discard_.clear();
+    shuffleCards(deck_);
+}
 void GameEngine::shuffleCards(std::vector<Card>& cards) {
     for (std::size_t i = cards.size(); i > 1; --i) { const auto j = static_cast<std::size_t>(random_.uniform(static_cast<int>(i))); std::swap(cards[i - 1], cards[j]); }
 }
@@ -161,8 +183,7 @@ std::optional<std::array<std::size_t, 3>> GameEngine::findTradeSet(const Player&
 }
 
 const Card* GameEngine::findCard(int cardId) const {
-    static const std::vector<Card> catalog = makeRiskDeck();
-    return cardId < 0 || cardId >= static_cast<int>(catalog.size()) ? nullptr : &catalog[static_cast<std::size_t>(cardId)];
+    return cardId < 0 || cardId >= static_cast<int>(cardCatalog_.size()) ? nullptr : &cardCatalog_[static_cast<std::size_t>(cardId)];
 }
 
 int GameEngine::tradeCardsForPlayer(int playerId) {
@@ -227,6 +248,7 @@ const std::vector<Player>& GameEngine::players() const { return players_; }
 const std::vector<Card>& GameEngine::deck() const { return deck_; }
 const std::vector<Card>& GameEngine::discard() const { return discard_; }
 const Player* GameEngine::currentPlayer() const { return currentPlayer_ < 0 || currentPlayer_ >= static_cast<int>(players_.size()) ? nullptr : &players_[static_cast<std::size_t>(currentPlayer_)]; }
+const std::string& GameEngine::mapId() const { return mapId_; }
 GameMode GameEngine::mode() const { return mode_; }
 const RulesOptions& GameEngine::rules() const { return rules_; }
 bool GameEngine::commanderDieUsed() const { return commanderDieUsed_; }
@@ -262,14 +284,22 @@ bool GameEngine::ownsConnectedPath(int sourceId, int targetId, int ownerId) cons
 
 Snapshot GameEngine::snapshot() const {
     Snapshot result;
-    result.version = 6; result.mode = mode_; result.rules = rules_; result.phase = phase_; result.currentPlayer = currentPlayer_; result.winner = winner_; result.turn = turn_; result.rngState = random_.state();
+    result.version = 6; result.mapId = mapId_; result.mode = mode_; result.rules = rules_; result.phase = phase_; result.currentPlayer = currentPlayer_; result.winner = winner_; result.turn = turn_; result.rngState = random_.state();
     result.players = players_; result.territories = territories_; result.deck = deck_; result.discard = discard_; result.tradeCount = tradeCount_; result.conqueredThisTurn = conqueredThisTurn_;
     result.commanderDieUsed = commanderDieUsed_; result.maneuverUsed = maneuverUsed_; result.maneuverSource = maneuverSource_; result.maneuverTarget = maneuverTarget_;
     return result;
 }
 
 bool GameEngine::restore(const Snapshot& snapshot) {
-    if (snapshot.version < 2 || snapshot.version > 6 || snapshot.players.size() < 2 || snapshot.players.size() > 5 || snapshot.territories.size() != 42) return false;
+    if (snapshot.version < 2 || snapshot.version > 6 || snapshot.players.size() < 2 || snapshot.players.size() > 5) return false;
+
+    const std::string restoredMapId = snapshot.mapId.empty() ? "world" : snapshot.mapId;
+    const auto definition = makeBuiltinMap(restoredMapId);
+    if (!definition || snapshot.territories.size() != definition->territories.size()) return false;
+    const int territoryCountValue = static_cast<int>(definition->territories.size());
+    const auto catalog = makeRiskDeck(territoryCountValue);
+    const auto validCardId = [&](int cardId) { return cardId >= 0 && cardId < static_cast<int>(catalog.size()); };
+
     const GameMode restoredMode = snapshot.version >= 4 ? snapshot.mode : GameMode::Classic;
     if (restoredMode != GameMode::Classic && restoredMode != GameMode::SecretMission && restoredMode != GameMode::Capital) return false;
     int neutralCount = 0, activeCount = 0;
@@ -281,41 +311,73 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     if (neutralCount > 0) { if (restoredMode != GameMode::Classic || neutralCount != 1 || activeCount != 2 || snapshot.players.size() != 3) return false; }
     else if ((restoredMode == GameMode::SecretMission || restoredMode == GameMode::Capital) && snapshot.players.size() < 3) return false;
     if (snapshot.currentPlayer < 0 || snapshot.currentPlayer >= static_cast<int>(snapshot.players.size()) || snapshot.players[static_cast<std::size_t>(snapshot.currentPlayer)].neutral) return false;
-    for (const auto& territory : snapshot.territories) if (territory.id < 0 || territory.id >= 42 || territory.owner < -1 || territory.owner >= static_cast<int>(snapshot.players.size()) || territory.armies < 0) return false;
+
+    std::vector<Territory> restoredTerritories = definition->territories;
+    for (std::size_t i = 0; i < snapshot.territories.size(); ++i) {
+        const auto& state = snapshot.territories[i];
+        if (state.id != static_cast<int>(i) || state.owner < -1 || state.owner >= static_cast<int>(snapshot.players.size()) || state.armies < 0) return false;
+        restoredTerritories[i].owner = state.owner;
+        restoredTerritories[i].armies = state.armies;
+    }
+
     if (snapshot.version >= 5 && snapshot.maneuverUsed) {
         const bool consumed = snapshot.maneuverSource == -1 && snapshot.maneuverTarget == -1;
-        const bool route = snapshot.maneuverSource >= 0 && snapshot.maneuverSource < 42
-            && snapshot.maneuverTarget >= 0 && snapshot.maneuverTarget < 42
+        const bool route = snapshot.maneuverSource >= 0 && snapshot.maneuverSource < territoryCountValue
+            && snapshot.maneuverTarget >= 0 && snapshot.maneuverTarget < territoryCountValue
             && snapshot.maneuverSource != snapshot.maneuverTarget;
         if (snapshot.phase != Phase::Maneuver || (!consumed && !route)) return false;
     }
 
-    std::array<bool, 42> headquarters{};
+    std::vector<bool> headquarters(static_cast<std::size_t>(territoryCountValue), false);
     for (const auto& player : snapshot.players) {
-        for (const int cardId : player.cards) if (findCard(cardId) == nullptr) return false;
+        for (const int cardId : player.cards) if (!validCardId(cardId)) return false;
         if (player.neutral && (!player.cards.empty() || player.mission.has_value() || player.headquarters >= 0)) return false;
         if (restoredMode == GameMode::SecretMission && !player.neutral && !player.mission.has_value()) return false;
         if (player.mission && player.mission->kind == MissionKind::Elimination && (player.mission->eliminationTarget < 0 || player.mission->eliminationTarget >= static_cast<int>(snapshot.players.size()) || snapshot.players[static_cast<std::size_t>(player.mission->eliminationTarget)].neutral)) return false;
-        if (restoredMode == GameMode::Capital) { if (player.headquarters < 0 || player.headquarters >= 42 || headquarters[static_cast<std::size_t>(player.headquarters)]) return false; headquarters[static_cast<std::size_t>(player.headquarters)] = true; }
-    }
-    if (snapshot.version >= 3) {
-        for (const auto& card : snapshot.deck) if (findCard(card.id) == nullptr) return false;
-        for (const auto& card : snapshot.discard) if (findCard(card.id) == nullptr) return false;
-    }
-    if (restoredMode == GameMode::Capital) {
-        const auto isHeadquartersCard = [&](int cardId) { const Card* card = findCard(cardId); return card != nullptr && card->territoryId >= 0 && headquarters[static_cast<std::size_t>(card->territoryId)]; };
-        for (const auto& player : snapshot.players) if (std::any_of(player.cards.begin(), player.cards.end(), isHeadquartersCard)) return false;
-        for (const auto& card : snapshot.deck) if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) return false;
-        for (const auto& card : snapshot.discard) if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) return false;
+        if (restoredMode == GameMode::Capital) {
+            if (player.headquarters < 0 || player.headquarters >= territoryCountValue || headquarters[static_cast<std::size_t>(player.headquarters)]) return false;
+            headquarters[static_cast<std::size_t>(player.headquarters)] = true;
+        }
     }
 
+    std::vector<Card> restoredDeck;
+    std::vector<Card> restoredDiscard;
+    if (snapshot.version >= 3) {
+        restoredDeck.reserve(snapshot.deck.size());
+        for (const auto& card : snapshot.deck) {
+            if (!validCardId(card.id)) return false;
+            restoredDeck.push_back(catalog[static_cast<std::size_t>(card.id)]);
+        }
+        restoredDiscard.reserve(snapshot.discard.size());
+        for (const auto& card : snapshot.discard) {
+            if (!validCardId(card.id)) return false;
+            restoredDiscard.push_back(catalog[static_cast<std::size_t>(card.id)]);
+        }
+    }
+
+    if (restoredMode == GameMode::Capital) {
+        const auto isHeadquartersCard = [&](int cardId) {
+            if (!validCardId(cardId)) return false;
+            const Card& card = catalog[static_cast<std::size_t>(cardId)];
+            return card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)];
+        };
+        for (const auto& player : snapshot.players) if (std::any_of(player.cards.begin(), player.cards.end(), isHeadquartersCard)) return false;
+        for (const auto& card : restoredDeck) if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) return false;
+        for (const auto& card : restoredDiscard) if (card.territoryId >= 0 && headquarters[static_cast<std::size_t>(card.territoryId)]) return false;
+    }
+
+    mapId_ = definition->id;
     mode_ = restoredMode;
     rules_ = snapshot.version >= 5 ? snapshot.rules : RulesOptions{};
     if (snapshot.version < 6) {
         rules_.fogOfWar = false;
         rules_.skynet = false;
     }
-    players_ = snapshot.players; territories_ = snapshot.territories; continents_ = makeWorldContinents(); phase_ = snapshot.phase;
+    players_ = snapshot.players;
+    territories_ = std::move(restoredTerritories);
+    continents_ = definition->continents;
+    cardCatalog_ = catalog;
+    phase_ = snapshot.phase;
     aiContinentGoals_.assign(players_.size(), -1);
     currentPlayer_ = snapshot.currentPlayer; winner_ = snapshot.winner; turn_ = snapshot.turn; random_.setState(snapshot.rngState); tradeCount_ = std::max(0, snapshot.tradeCount); conqueredThisTurn_ = snapshot.conqueredThisTurn;
     commanderDieUsed_ = rules_.commanderDie && snapshot.commanderDieUsed;
@@ -324,7 +386,7 @@ bool GameEngine::restore(const Snapshot& snapshot) {
     if (maneuverUsed_ && maneuverSource_ >= 0
         && (territories_[static_cast<std::size_t>(maneuverSource_)].owner != currentPlayer_
             || territories_[static_cast<std::size_t>(maneuverTarget_)].owner != currentPlayer_)) return false;
-    if (snapshot.version >= 3) { deck_ = snapshot.deck; discard_ = snapshot.discard; }
+    if (snapshot.version >= 3) { deck_ = std::move(restoredDeck); discard_ = std::move(restoredDiscard); }
     else { const auto savedRng = random_.state(); initializeDeck(); random_.setState(savedRng); tradeCount_ = 0; conqueredThisTurn_ = false; }
     updateEliminationsAndWinner();
     return currentPlayer_ >= 0 && currentPlayer_ < static_cast<int>(players_.size());
@@ -372,9 +434,14 @@ int GameEngine::tradeValue(int completedTrades) {
     if (completedTrades < 0) return values.front();
     return completedTrades < static_cast<int>(values.size()) ? values[static_cast<std::size_t>(completedTrades)] : 15 + (completedTrades - 5) * 5;
 }
-std::vector<Card> GameEngine::makeRiskDeck() {
-    std::vector<Card> cards; cards.reserve(44); for (int territory = 0; territory < 42; ++territory) cards.push_back({territory, static_cast<CardType>(territory % 3), territory});
-    cards.push_back({42, CardType::Wild, -1}); cards.push_back({43, CardType::Wild, -1}); return cards;
+std::vector<Card> GameEngine::makeRiskDeck(int territoryCount) {
+    if (territoryCount < 0) return {};
+    std::vector<Card> cards;
+    cards.reserve(static_cast<std::size_t>(territoryCount + 2));
+    for (int territory = 0; territory < territoryCount; ++territory) cards.push_back({territory, static_cast<CardType>(territory % 3), territory});
+    cards.push_back({territoryCount, CardType::Wild, -1});
+    cards.push_back({territoryCount + 1, CardType::Wild, -1});
+    return cards;
 }
 
 std::string phaseName(Phase phase) {
