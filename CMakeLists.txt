@@ -51,6 +51,23 @@ set_target_properties(winrisk_app PROPERTIES
     QT_ANDROID_PACKAGE_NAME com.winrisk.game
 )
 
+if(ANDROID)
+    set_target_properties(winrisk_app PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/platform/android"
+        QT_ANDROID_MIN_SDK_VERSION 28
+        QT_ANDROID_TARGET_SDK_VERSION 36
+        QT_ANDROID_COMPILE_SDK_VERSION 36
+        QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        QT_ANDROID_VERSION_CODE 1
+    )
+endif()
+
+if(EMSCRIPTEN)
+    set_target_properties(winrisk_app PROPERTIES
+        QT_WASM_INITIAL_MEMORY "96MB"
+    )
+endif()
+
 include(CTest)
 if(BUILD_TESTING)
     add_executable(winrisk_engine_tests tests/engine_tests.cpp)
