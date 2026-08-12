@@ -1,89 +1,102 @@
 # WinRisk
 
-WinRisk is a web implementation of the classic world domination board game:
-a **Spring Boot** server wrapping a pure-Java game engine, with a **React**
-single-page client rendered on canvas. Play solo against 1–4 AI opponents;
-the server hosts many concurrent games.
+WinRisk is a personal full-stack engineering project built around a turn-based territory-control game. It combines a **pure Java game engine**, a **Spring Boot** server and a **React + TypeScript** single-page client.
 
-## Prerequisites
-- Java 17 or newer
-- Node.js 22 or newer (only for building/serving the web client)
+The project is primarily an exercise in preserving a non-trivial domain model while evolving the delivery architecture: the original desktop application was separated from its UI, made headless-capable, exposed through a concurrent web service, and connected to a real-time browser client.
+
+## Engineering highlights
+
+- Java game engine kept independent from the web layer
+- Spring Boot REST API with explicit validation and error mapping
+- multiple concurrent game sessions with per-game synchronization
+- monotonically versioned game state to handle reordered real-time messages
+- STOMP/WebSocket updates for live AI turns
+- React + TypeScript SPA built into the same deployable Spring Boot JAR
+- deterministic headless simulations for testing and experimentation
+- save/load support and multiple built-in/procedural maps
+- JUnit test suites, integration tests and a JaCoCo coverage gate
+- CI that builds the backend and frontend and smoke-tests the packaged application
+
+## Architecture
+
+```text
+React + TypeScript SPA
+        |
+        | REST commands
+        | STOMP/WebSocket state updates
+        v
+Spring Boot web layer
+        |
+        | synchronized game sessions
+        v
+Pure Java game engine
+        |
+        +-- rules and turn flow
+        +-- AI players
+        +-- maps and missions
+        +-- serialization
+        +-- headless simulation
+```
+
+The browser sends commands through REST. State changes are broadcast over `/topic/games/{id}` through the STOMP endpoint at `/ws`. The client rejects stale versions, allowing broadcasts to occur outside the game-session lock without making message arrival order part of the consistency model.
 
 ## Build and run
 
+Requirements:
+
+- Java 17+
+- Node.js 22+ for building/serving the web client
+
 ```bash
-./gradlew build                 # engine + web tests, coverage gate, boot jar with the SPA
+./gradlew build
 java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
 ```
 
-Open http://localhost:8080 — create a game in the lobby and play. Add
-`--server.port=<port>` to change the port, or `-PskipFrontend` to the build to
-produce a jar without the web client.
+Open `http://localhost:8080`.
 
-For frontend development run the API and the Vite dev server side by side:
+For frontend development:
 
 ```bash
-./gradlew bootRun               # API on :8080
-cd frontend && npm install && npm run dev    # UI on :5173, proxied to :8080
+./gradlew bootRun
+cd frontend
+npm install
+npm run dev
 ```
 
-## Playing
-- **REINFORCE**: click your territory to place one troop ("place all" toggle
-  places everything); trade card sets from the panel when you hold three or
-  more (forced at five).
-- **ATTACK**: click your territory, then an adjacent enemy; dice results pop up
-  as toasts and conquests resolve automatically.
-- **MOVE**: click a source, then a connected territory, choose the troop count.
-- End Phase hands over; AI turns animate live over a WebSocket.
+The Vite development server runs on port `5173` and proxies the API to the backend on port `8080`.
 
-Game modes: World Domination (classic), Secret Mission, Capital. Optional
-rules: attack-with-all, fog of war, skynet, incremental card values, expanded
-maneuver, attack card reroll, commander die.
-
-## Maps
-Built-in boards: the classic 42-territory **World** map plus four historical
-supercontinents — **Pangaea**, **Laurasia**, **Gondwana**, **Rodinia** — and
-procedurally generated random maps. Custom `.map` files placed in a `maps/`
-directory next to the server appear in the lobby's map list.
-
-## Saving
-Games can be saved from the HUD and resumed from the lobby. Saves are JSON
-files in a `saves/` directory next to the server; the format is unchanged from
-earlier releases, so old saves still load.
+Use `-PskipFrontend` when a backend-only JAR is sufficient.
 
 ## Headless simulation
-The same jar runs AI-only simulations without starting the server:
+
+The same application can run AI-only games without starting the server:
 
 ```bash
 java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar --headless-play \
     --map=pangaea --ai-players=4 --seed=42 --mode=classic
 ```
 
-Flags: `--map=<builtin or path>`, `--mode=<classic|secret|capital>`,
-`--ai-players=<1..5>`, `--seed=<long>`, `--max-turns=<n>`, plus the rule
-toggles (`--fog-of-war`, `--skynet`, `--attack-with-all`,
-`--incremental-cards`, `--expanded-maneuver`, `--attack-card-reroll`,
-`--commander-die`).
+Supported options include built-in/custom maps, game modes, deterministic seeds, turn limits and optional rules.
 
-## REST API
-The client speaks a small JSON API under `/api` (games CRUD, place / attack /
-maneuver / end-phase / trade actions, saves, maps) and receives live state
-frames on the STOMP WebSocket topic `/topic/games/{id}` via `/ws`. See
-`com.winrisk.web.api.GameController` for the full surface.
+## Gameplay scope
+
+The implementation supports solo play against AI opponents, multiple game modes, saved games, custom maps and several optional rules. Built-in boards include a classic world layout plus Pangaea, Laurasia, Gondwana and Rodinia, along with procedurally generated maps.
 
 ## Repository structure
-- `src/main/java/com/winrisk/game` – the game engine (rules, AI, maps, missions, serialization)
-- `src/main/java/com/winrisk/web` – Spring Boot server: sessions, REST API, WebSocket push, AI stepper
-- `frontend/` – React SPA (Vite + TypeScript), built into the boot jar
-- `src/test/java` – JUnit suites for the engine and the web layer
 
-## Notes
-- The former Swing desktop client was removed in the web conversion (it lives
-  in git history); the in-game map editor went with it. Custom maps can still
-  be loaded from files.
-- Interactive dice/occupation prompts and human setup placement use sensible
-  defaults (max dice, max occupation, automatic setup); making them
-  interactive over the WebSocket is a planned follow-up.
+- `src/main/java/com/winrisk/game` — domain model, rules, AI, maps, missions and serialization
+- `src/main/java/com/winrisk/web` — Spring Boot API, sessions, WebSocket broadcasting and AI scheduling
+- `frontend/` — React + TypeScript SPA built with Vite
+- `src/test/java` — engine, service, controller and integration tests
 
-A coverage report is generated under `build/reports/jacoco`; the build fails
-below the configured threshold.
+## Quality gates
+
+`./gradlew build` runs the automated test suite and JaCoCo verification. The CI pipeline also packages the SPA into the boot JAR, starts the resulting artifact and smoke-tests both the API and served frontend.
+
+## Project status
+
+Active personal project. The current web architecture replaced an earlier Swing client while retaining the underlying engine and save compatibility. The repository includes historical evolution in Git so architectural changes can be inspected rather than presented only as a finished snapshot.
+
+## Naming
+
+This is an unofficial personal software-engineering project and is not presented as an official implementation or product of any commercial board-game publisher.
