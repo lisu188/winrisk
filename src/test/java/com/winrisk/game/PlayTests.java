@@ -8,7 +8,6 @@ import com.winrisk.game.data.GamePhase;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Player;
-import com.winrisk.gui.StartGame;
 import org.junit.Test;
 
 import java.io.File;
@@ -18,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -42,6 +42,24 @@ public class PlayTests {
         params.setHumanPlayers(0);
         params.setAiPlayers(2);
         new Play(params, 0).play();
+    }
+
+    @Test
+    public void headlessPlayReportsDrawWhenNoWinnerWithinTurnLimit() throws Exception {
+        System.setProperty("java.awt.headless", "true");
+        Params params = new Params();
+        params.setHumanPlayers(0);
+        params.setAiPlayers(3);
+        params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
+        // Players that never attack can never be eliminated, so the game cannot
+        // end within the turn limit: this must be reported as a draw, not crash.
+        params.setAiFactory(index -> new PassiveRecorderAI());
+
+        Play.Result result = new Play(params, 5).playResult();
+
+        assertTrue(result.isDraw());
+        assertEquals(null, result.getWinner());
+        assertTrue(result.getWinReason().contains("turn limit"));
     }
 
     @Test
@@ -99,7 +117,7 @@ public class PlayTests {
 
     @Test
     public void headlessArgumentParsingEnablesToggles() {
-        StartGame.HeadlessConfig config = StartGame.buildHeadlessConfig(new String[]{
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(new String[]{
                 "--headless-play",
                 "--fog-of-war",
                 "--skynet",
@@ -116,6 +134,17 @@ public class PlayTests {
         assertEquals(4, params.getAiPlayers());
         assertEquals(0, params.getHumanPlayers());
         assertEquals(250, config.getMaxTurns());
+    }
+
+    @Test
+    public void headlessArgumentParsingHandlesNullArgsWithDefaults() {
+        HeadlessCli.HeadlessConfig config = HeadlessCli.buildHeadlessConfig(null);
+
+        Params params = config.getParams();
+        assertFalse(config.isHeadlessPlay());
+        assertEquals(0, params.getAiPlayers());
+        assertEquals(1, params.getHumanPlayers());
+        assertEquals(5000, config.getMaxTurns());
     }
 
     @Test

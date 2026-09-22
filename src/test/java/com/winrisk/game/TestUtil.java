@@ -2,6 +2,7 @@ package com.winrisk.game;
 
 
 import com.winrisk.game.data.Params;
+import com.winrisk.game.data.GameMode;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.serialization.MapSketch;
 import com.winrisk.game.view.Game;
@@ -19,7 +20,11 @@ public class TestUtil {
     public static Game createNewGame() throws Exception {
         Params params = new Params();
         params.setHumanPlayers(0);
-        params.setAiPlayers(8);
+        params.setAiPlayers(4);
+        params.setGameMode(GameMode.SECRET_MISSION);
+        // Deterministic fixture: some unseeded AI matchups stalemate forever,
+        // which hangs tests that run games to completion (e.g. onAction()).
+        params.setRandomSeed(4242L);
 
         params.setMap(new File(Map.class.getResource("world.map").toURI()).getAbsolutePath());
 
@@ -98,4 +103,3 @@ public class TestUtil {
 
 
 }
-

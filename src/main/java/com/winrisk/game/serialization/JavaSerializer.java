@@ -12,8 +12,24 @@ public class JavaSerializer implements Serializer {
 
     @Override
     public void load(Saveable map, String path) {
-        try (InputStream fileStream = new FileInputStream(new File(path))) {
-            byte[] raw = readAll(fileStream);
+        requireSaveable(map);
+        File input = requirePath(path);
+        try (InputStream fileStream = new FileInputStream(input)) {
+            load(map, fileStream, input.getAbsolutePath());
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Could not load serialized data from " + input.getAbsolutePath(), e);
+        }
+    }
+
+    @Override
+    public void load(Saveable map, InputStream input, String sourceName) {
+        requireSaveable(map);
+        if (input == null) {
+            throw new IllegalArgumentException("Input stream cannot be null: " + sourceName);
+        }
+        try {
+            byte[] raw = readAll(input);
             byte[] data = isGzip(raw) ? decompress(raw) : raw;
 
             Sketch sketch = tryJsonDeserialize(map, data);
@@ -21,23 +37,50 @@ public class JavaSerializer implements Serializer {
                 sketch = tryJavaDeserialize(data);
             }
 
-            if (sketch != null) {
-                map.fromSketch(sketch);
+            if (sketch == null) {
+                throw new IllegalArgumentException(
+                        "Unsupported serialized data: " + sourceName);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            applySketch(map, sketch, sourceName);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Could not load serialized data from " + sourceName, e);
         }
     }
 
     @Override
     public void save(Saveable map, String path) {
-        try (FileOutputStream mapFile = new FileOutputStream(new File(path))) {
+        requireSaveable(map);
+        File output = requirePath(path);
+        try (FileOutputStream mapFile = new FileOutputStream(output)) {
             String json = gson.toJson(map.toSketch(), map.getSketchClass());
             mapFile.write(json.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Could not save serialized data to " + output.getAbsolutePath(), e);
         }
+    }
 
+    private void requireSaveable(Saveable saveable) {
+        if (saveable == null) {
+            throw new IllegalArgumentException("Saveable cannot be null");
+        }
+    }
+
+    private File requirePath(String path) {
+        if (path == null || path.trim().isEmpty()) {
+            throw new IllegalArgumentException("Path cannot be null or blank");
+        }
+        return new File(path);
+    }
+
+    private void applySketch(Saveable saveable, Sketch sketch, String sourceName) {
+        try {
+            saveable.fromSketch(sketch);
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException(
+                    "Invalid serialized data: " + sourceName, e);
+        }
     }
 
     private byte[] readAll(InputStream inputStream) throws IOException {

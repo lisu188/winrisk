@@ -6,8 +6,6 @@ import com.winrisk.game.object.Continent;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.serialization.*;
 import com.winrisk.game.util.PointF;
-import com.winrisk.game.view.Game;
-import com.winrisk.game.view.GameSurface;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,24 +33,13 @@ public class Map implements Saveable {
 
     public void addField(PointF point) {
         fields.add(new Field(new PointF(point.x, point.y)));
-    }
-
-    public void draw(GameSurface graphics, Game game) {
-        graphics.drawBackground(image);
-        for (Field field : fields) {
-            field.drawLines(graphics);
-        }
-
-        for (Field field : (game == null) || !game.getParams().isFogOfWar() ? fields
-                : game.getPlayers().get(0)
-                .getVis(game)) {
-            field.drawFields(graphics);
-        }
+        applyMetadata();
     }
 
     @Override
     public void fromSketch(Sketch sketch) {
         ((MapSketch) sketch).toMap(this);
+        applyMetadata();
 
     }
 
@@ -79,6 +66,15 @@ public class Map implements Saveable {
 
     public void load(String path) {
         serializer.load(this, path);
+        applyMetadata();
+    }
+
+    /**
+     * Loads a map from a stream, e.g. a classpath resource inside a jar.
+     */
+    public void load(java.io.InputStream input, String sourceName) {
+        serializer.load(this, input, sourceName);
+        applyMetadata();
     }
 
     public void save(String path) {
@@ -147,5 +143,9 @@ public class Map implements Saveable {
 
     public int proximity(int i, int j) {
         return proximity(null, fields.get(i), fields.get(j));
+    }
+
+    public void applyMetadata() {
+        WorldTerritoryMetadata.apply(this);
     }
 }

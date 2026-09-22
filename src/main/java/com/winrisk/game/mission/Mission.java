@@ -16,15 +16,29 @@ public class Mission {
     private final String description;
     private final Condition condition;
     private final Player eliminationTarget;
+    private final MissionSpec spec;
 
     public Mission(String description, Condition condition) {
-        this(description, condition, null);
+        this(description, condition, null, null);
     }
 
     public Mission(String description, Condition condition, Player eliminationTarget) {
+        this(description, condition, eliminationTarget, null);
+    }
+
+    public Mission(String description, Condition condition, Player eliminationTarget, MissionSpec spec) {
         this.description = description;
         this.condition = condition;
         this.eliminationTarget = eliminationTarget;
+        this.spec = spec;
+    }
+
+    /**
+     * @return the serializable description of this mission, or {@code null}
+     * for ad-hoc missions that were not built from a {@link MissionSpec}.
+     */
+    public MissionSpec getSpec() {
+        return spec;
     }
 
     public boolean isCompleted(Game game, Player player) {

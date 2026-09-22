@@ -1,12 +1,10 @@
 package com.winrisk.game.ai;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-@SuppressWarnings("serial")
 public class PlayerFactory {
     private static final Random RANDOM = new SecureRandom();
 
@@ -14,34 +12,26 @@ public class PlayerFactory {
     private static final Class<? extends PlayerInterface> HUMAN;
 
     static {
-        List<Class<? extends PlayerInterface>> ALL = new ArrayList<Class<? extends PlayerInterface>>() {
-            {
-                add(PlayerAI.class);
-                add(EasyAI.class);
-                add(ContinentAI.class);
-                add(BalancedAI.class);
-                add(BorderGuardAI.class);
-                add(RandomAI.class);
-            }
-        };
-        AI = ALL.stream()
+        List<Class<? extends PlayerInterface>> all = List.of(
+                PlayerAI.class,
+                EasyAI.class,
+                ContinentAI.class,
+                BalancedAI.class,
+                BorderGuardAI.class,
+                RandomAI.class);
+        AI = all.stream()
                 .filter(clas -> clas
                         .isAnnotationPresent(ArtificialIntelligence.class))
                 .collect(Collectors.toList());
-        HUMAN = ALL
-                .stream()
-                .filter(clas -> !clas
-                        .isAnnotationPresent(ArtificialIntelligence.class))
-                .collect(Collectors.toList()).get(0);
+        HUMAN = InteractiveHuman.class;
     }
 
     private static <T> T buildClass(Class<? extends T> clas) {
         try {
-            return clas.newInstance();
-        } catch (Exception e) {
-            e.printStackTrace();
+            return clas.getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Could not instantiate " + clas.getName(), e);
         }
-        return null;
     }
 
     public static PlayerInterface getHuman() {
@@ -51,5 +41,28 @@ public class PlayerFactory {
     public static PlayerInterface getRandomAI() {
         return buildClass(AI.get(RANDOM.nextInt(AI.size())));
 
+    }
+
+    public static PlayerInterface getDefaultAI(int index) {
+        return buildClass(AI.get(Math.floorMod(index, AI.size())));
+    }
+
+    /**
+     * Rebuilds a player interface from its concrete class name. Used when
+     * restoring a saved game so each seat keeps its original controller.
+     */
+    public static PlayerInterface byClassName(String className) {
+        if (className == null) {
+            return getHuman();
+        }
+        try {
+            Class<?> clas = Class.forName(className);
+            if (!PlayerInterface.class.isAssignableFrom(clas)) {
+                throw new IllegalArgumentException("Not a PlayerInterface: " + className);
+            }
+            return (PlayerInterface) buildClass(clas.asSubclass(PlayerInterface.class));
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException("Unknown player interface: " + className, e);
+        }
     }
 }

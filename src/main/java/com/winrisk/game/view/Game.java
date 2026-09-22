@@ -4,22 +4,33 @@ import com.winrisk.game.ai.PlayerFactory;
 import com.winrisk.game.ai.PlayerInterface;
 import com.winrisk.game.cluster.FieldList;
 import com.winrisk.game.cluster.PlayerList;
+import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.GamePhase;
-import com.winrisk.game.data.MotionEvent;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.mission.Mission;
 import com.winrisk.game.mission.MissionDeck;
 import com.winrisk.game.map.Map;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.object.Player;
+import com.winrisk.game.rules.CombatResolver;
+import com.winrisk.game.rules.CombatResult;
+import com.winrisk.game.rules.OfficialSetup;
+import com.winrisk.game.rules.RiskCard;
+import com.winrisk.game.rules.RiskCardService;
+import com.winrisk.game.rules.WinConditionEvaluator;
+import com.winrisk.game.serialization.GameSketch;
+import com.winrisk.game.serialization.JavaSerializer;
 import com.winrisk.game.serialization.MapSketch;
+import com.winrisk.game.serialization.Saveable;
+import com.winrisk.game.serialization.Serializer;
+import com.winrisk.game.serialization.Sketch;
 import com.winrisk.game.util.Colors;
-import com.winrisk.game.util.PointF;
 
+import java.awt.Color;
+import java.util.List;
 import java.util.Random;
 
-public class Game implements FieldListener, Viewable {
-    private final FieldDetector fieldDetector = new FieldDetector(this);
+public class Game implements Saveable {
     private int curPlayer;
     private GamePhase curState;
     private Map map = new Map();
@@ -29,25 +40,44 @@ public class Game implements FieldListener, Viewable {
     private PlayerList players;
     private MissionDeck missionDeck;
     private Player missionWinner;
+    private Player winner;
+    private String winReason;
+    private Player neutralPlayer;
+    private Random random;
+    private RiskCardService cardService;
+    private CombatResolver combatResolver;
+    private WinConditionEvaluator winConditionEvaluator;
+    private boolean maneuverUsed;
+    private Field maneuverSource;
+    private Field maneuverDestination;
+    private boolean commanderDieUsed;
+    private final Serializer serializer = new JavaSerializer();
 
     public Game(Params params) {
         this.params = params;
+        this.random = params.createRandom();
+        this.cardService = new RiskCardService(random, params.getRulesOptions());
+        this.combatResolver = new CombatResolver(random);
+        this.winConditionEvaluator = new WinConditionEvaluator();
         this.map = params.loadMap();
         startNewGame();
     }
 
+    /**
+     * Creates an uninitialised game with no setup performed. Used when loading
+     * a saved game, where {@link #fromSketch(Sketch)} restores all state.
+     */
+    public Game() {
+    }
+
     public boolean end() {
-        evaluateMissionWin();
-        if (missionWinner != null) {
-            return true;
+        winner = winConditionEvaluator.evaluate(this);
+        winReason = winConditionEvaluator.getReason();
+        if (params.getGameMode() == GameMode.SECRET_MISSION
+                && "secret mission completed".equals(winReason)) {
+            missionWinner = winner;
         }
-        int alive = 0;
-        for (Player player : players) {
-            if (!player.isDead(this)) {
-                alive++;
-            }
-        }
-        return (alive == 1);
+        return winner != null;
     }
 
     public int getCurPlayer() {
@@ -56,11 +86,6 @@ public class Game implements FieldListener, Viewable {
 
     public void setCurPlayer(int curPlayer) {
         this.curPlayer = curPlayer;
-    }
-
-    @Override
-    public FieldList getFieldList() {
-        return map.getFields();
     }
 
     public FieldList getFields() {
@@ -106,77 +131,125 @@ public class Game implements FieldListener, Viewable {
 
     public void setPlayers(PlayerList players) {
         this.players = players;
+        if (players != null && !players.isEmpty() && curPlayer >= players.size()) {
+            curPlayer = 0;
+        }
     }
 
     public Player getMissionWinner() {
+        if (missionWinner == null) {
+            end();
+        }
         return missionWinner;
     }
 
     public Player getWinner() {
-        if (missionWinner != null) {
-            return missionWinner;
+        if (winner == null) {
+            end();
         }
-        return players.stream()
-                .filter(player -> !player.isDead(this))
-                .findFirst()
-                .orElse(null);
+        return winner;
+    }
+
+    public String getWinReason() {
+        if (winReason == null) {
+            end();
+        }
+        return winReason;
+    }
+
+    public Random getRandom() {
+        return random;
+    }
+
+    public RiskCardService getCardService() {
+        return cardService;
+    }
+
+    public Player getNeutralPlayer() {
+        return neutralPlayer;
+    }
+
+    public Player getDefenseController(Player defender) {
+        if (defender == neutralPlayer && players != null) {
+            return players.stream()
+                    .filter(player -> !player.isNeutral())
+                    .filter(player -> player != getPlayer())
+                    .findFirst()
+                    .orElse(getPlayer());
+        }
+        return defender;
+    }
+
+    public boolean isCommanderDieUsed() {
+        return commanderDieUsed;
+    }
+
+    public void setCommanderDieUsed(boolean commanderDieUsed) {
+        this.commanderDieUsed = commanderDieUsed;
+    }
+
+    public boolean isManeuverUsed() {
+        return maneuverUsed;
     }
 
     private void incState() {
         curState = curState.getNextState();
         if (curState == GamePhase.REINFORCE) {
-            curPlayer = (curPlayer + 1) % players.size();
-            getPlayer().applyCardBonus();
-            getPlayer().applyContinentBonus(map.getContinents());
-            getPlayer().applyTerritoryBonus(map.getFields(), this);
+            advanceToNextActivePlayer();
+            maneuverUsed = false;
+            maneuverSource = null;
+            maneuverDestination = null;
+            commanderDieUsed = false;
+            Player player = getPlayer();
+            player.setConqueredTerritoryThisTurn(false);
+            cardService.beginTurn(this, player);
+            player.applyContinentBonus(map.getContinents());
+            player.applyTerritoryBonus(map.getFields(), this);
+        } else if (curState == GamePhase.MOVE) {
+            cardService.awardConquestCard(getPlayer());
         }
     }
 
-    private void initFields() {
-        Random gen = new Random();
-        int fields = map.getFields().size();
-        for (int i = 0; i < fields; i++) {
-            map.getFields().get(i).setArmy(gen.nextInt(9) + 1);
-        }
-        for (int i = 0; i < fields; i++) {
-            int player = gen.nextInt(players.size());
-            players.get(player).obtainField(map.getFields().get(i));
-        }
+    private void advanceToNextActivePlayer() {
+        do {
+            curPlayer = (curPlayer + 1) % players.size();
+        } while (getPlayer().isNeutral() || getPlayer().isDead(this));
     }
 
     private void initPlayers() {
         players = new PlayerList();
         int playerCount = params.getAiPlayers() + params.getHumanPlayers();
-        for (int i = 0; i < (map.getFields().size() < playerCount ? map
-                .getFields().size() : playerCount); i++) {
+        validatePlayerCount(playerCount);
+        for (int i = 0; i < playerCount; i++) {
             PlayerInterface ifc;
             if (i < params.getHumanPlayers()) {
                 ifc = PlayerFactory.getHuman();
             } else {
                 ifc = params.getAiFactory().getAi(i);
             }
-            players.add(new Player(Colors.get(i), ifc));
+            players.add(new Player(Colors.getPlayer(i), ifc));
+        }
+        if (params.getGameMode() == GameMode.CLASSIC && playerCount == 2) {
+            neutralPlayer = new Player(Colors.NEUTRAL, new com.winrisk.game.ai.PlayerAI());
+            neutralPlayer.setNeutral(true);
+            players.add(neutralPlayer);
         }
     }
 
-    private void assignMissions() {
-        missionDeck = new MissionDeck(map, players);
-        for (Player player : players) {
-            Mission mission = missionDeck.draw(player);
-            player.setMission(mission);
+    private void validatePlayerCount(int playerCount) {
+        int min = params.getGameMode() == GameMode.CLASSIC ? 2 : 3;
+        if (playerCount < min || playerCount > 5) {
+            throw new IllegalArgumentException(params.getGameMode()
+                    + " supports " + min + "-5 active players");
         }
     }
 
-    private void evaluateMissionWin() {
-        if (missionWinner != null) {
-            return;
-        }
+    public void assignMissions() {
+        missionDeck = new MissionDeck(map, players, random);
         for (Player player : players) {
-            Mission mission = player.getMission();
-            if ((mission != null) && !player.isDead(this)
-                    && mission.isCompleted(this, player)) {
-                missionWinner = player;
-                break;
+            if (!player.isNeutral()) {
+                Mission mission = missionDeck.draw(player);
+                player.setMission(mission);
             }
         }
     }
@@ -195,27 +268,50 @@ public class Game implements FieldListener, Viewable {
         return !player.getPlayerInterface().isInteractive();
     }
 
-    @Override
     public void onAction() {
         while (next()) ;
     }
 
-    @Override
-    public void onClose() {
-
+    public CombatResult attack(Field from, Field to) {
+        return combatResolver.attack(this, from, to);
     }
 
-    @Override
-    public void onDraw(GameSurface graphics) {
-        map.draw(graphics, this);
+    public boolean maneuver(Field from, Field to, int troops) {
+        if (from == null || to == null) {
+            return false;
+        }
+        if (params.getRulesOptions().isExpandedManeuver()) {
+            return from.getPlayer() == getPlayer()
+                    && from.getPlayer() == to.getPlayer()
+                    && from.getPatch().contains(to)
+                    && from.move(to, troops);
+        }
+        // Official rules allow a single fortification move of any number of
+        // armies from one territory to one connected territory. Once a route
+        // has been used this turn, only further moves along that same route are
+        // permitted (so a UI can move armies one at a time), while starting a
+        // different fortification is blocked.
+        if (maneuverUsed && (from != maneuverSource || to != maneuverDestination)) {
+            return false;
+        }
+        if (from.getPlayer() != getPlayer()) {
+            return false;
+        }
+        if (from.getPlayer() != to.getPlayer()) {
+            return false;
+        }
+        if (!from.getPatch().contains(to)) {
+            return false;
+        }
+        boolean moved = from.move(to, troops);
+        if (moved) {
+            maneuverUsed = true;
+            maneuverSource = from;
+            maneuverDestination = to;
+        }
+        return moved;
     }
 
-    @Override
-    public void onEvent(MotionEvent event) {
-        fieldDetector.feed(event);
-    }
-
-    @Override
     public boolean onFieldDrag(Field from, Field to) {
         switch (getPhase()) {
             case REINFORCE:
@@ -232,25 +328,16 @@ public class Game implements FieldListener, Viewable {
                 if (!from.getNext().contains(to)) {
                     return false;
                 }
-                from.fight(to, this);
-                return true;
+                return attack(from, to).isLegal();
 
             case MOVE:
-                if (from.getPlayer() != getPlayer()) {
-                    return false;
-                }
-                if (!from.getPatch().contains(to)) {
-                    return false;
-                }
-                from.move(to, 1);
-                return true;
+                return maneuver(from, to, 1);
             case UNDEFINED:
                 throw new RuntimeException("Undefined game state");
         }
         return false;
     }
 
-    @Override
     public boolean onFromField(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -262,7 +349,6 @@ public class Game implements FieldListener, Viewable {
         return true;
     }
 
-    @Override
     public boolean onLongClick(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -274,12 +360,101 @@ public class Game implements FieldListener, Viewable {
         return true;
     }
 
-    @Override
-    public void onSave(String path) {
-        throw new UnsupportedOperationException();
+    public void save(String path) {
+        serializer.save(this, path);
+    }
+
+    public void load(String path) {
+        serializer.load(this, path);
+    }
+
+    /**
+     * Loads a previously saved game from the given path.
+     */
+    public static Game loadGame(String path) {
+        Game game = new Game();
+        game.load(path);
+        return game;
     }
 
     @Override
+    public Sketch toSketch() {
+        return new GameSketch(this);
+    }
+
+    @Override
+    public Class<? extends Sketch> getSketchClass() {
+        return GameSketch.class;
+    }
+
+    @Override
+    public void fromSketch(Sketch sketch) {
+        GameSketch gs = (GameSketch) sketch;
+        this.params = gs.params.toParams();
+        this.random = params.createRandom();
+        this.cardService = new RiskCardService(random, params.getRulesOptions());
+        this.combatResolver = new CombatResolver(random);
+        this.winConditionEvaluator = new WinConditionEvaluator();
+        this.map = new Map();
+        this.map.fromSketch(gs.map);
+
+        this.players = new PlayerList();
+        for (GameSketch.PlayerData pd : gs.players) {
+            Player player = new Player(new Color(pd.colorRgb, true),
+                    PlayerFactory.byClassName(pd.interfaceClass));
+            player.setNeutral(pd.neutral);
+            player.setRein(pd.reinforcements);
+            player.setConqueredTerritoryThisTurn(pd.conqueredTerritoryThisTurn);
+            for (GameSketch.CardData cd : pd.cards) {
+                player.addCard(buildCard(cd));
+            }
+            players.add(player);
+        }
+
+        List<Field> fields = map.getFields();
+        for (int i = 0; i < gs.players.size(); i++) {
+            GameSketch.PlayerData pd = gs.players.get(i);
+            Player player = players.get(i);
+            if (pd.mission != null) {
+                player.setMission(MissionDeck.fromSpec(pd.mission, players));
+            }
+            if (pd.headquartersIndex >= 0) {
+                player.setHeadquarters(fields.get(pd.headquartersIndex));
+            }
+        }
+
+        for (int i = 0; i < fields.size(); i++) {
+            Field field = fields.get(i);
+            field.setArmy(gs.fieldArmy[i]);
+            field.setPlayer(gs.fieldOwner[i] >= 0 ? players.get(gs.fieldOwner[i]) : null);
+        }
+
+        this.neutralPlayer = gs.neutralPlayerIndex >= 0
+                ? players.get(gs.neutralPlayerIndex) : null;
+
+        cardService.setTradeCount(gs.tradeCount);
+        cardService.getDeck().restore(buildCards(gs.drawPile), buildCards(gs.discardPile));
+
+        this.curPlayer = gs.curPlayer;
+        this.curState = gs.phase;
+        this.commanderDieUsed = gs.commanderDieUsed;
+        this.maneuverUsed = gs.maneuverUsed;
+    }
+
+    private java.util.List<RiskCard> buildCards(java.util.List<GameSketch.CardData> data) {
+        java.util.List<RiskCard> cards = new java.util.ArrayList<>();
+        for (GameSketch.CardData cd : data) {
+            cards.add(buildCard(cd));
+        }
+        return cards;
+    }
+
+    private RiskCard buildCard(GameSketch.CardData cd) {
+        return cd.fieldIndex < 0
+                ? RiskCard.wild()
+                : RiskCard.territory(map.getFields().get(cd.fieldIndex));
+    }
+
     public boolean onShortClick(Field field) {
         if (getPhase() != GamePhase.REINFORCE) {
             return false;
@@ -291,27 +466,10 @@ public class Game implements FieldListener, Viewable {
         return true;
     }
 
-    @Override
-    public boolean onToField(Field field) {
-        return false;
-
-    }
-
-    @Override
-    public boolean onVoidClick(PointF point) {
-        return false;
-    }
-
-    @Override
-    public boolean onVoidDrag(PointF from, PointF to) {
-        return true;
-    }
-
     private void startNewGame() {
         initPlayers();
-        initFields();
-        assignMissions();
-        curPlayer = -1;
+        int firstPlayer = new OfficialSetup(this, random).setup();
+        curPlayer = firstPlayer - 1;
         curState = GamePhase.UNDEFINED;
         incState();
     }

@@ -2,14 +2,18 @@ package com.winrisk.game.util;
 
 public class Arrays {
     public static float avg(float[] tab) {
-        int av = 0;
+        validateAverageInput(tab);
+
+        float av = 0f;
         for (float element : tab) {
             av += element;
         }
-        return av / (float) tab.length;
+        return av / tab.length;
     }
 
     public static float avg(Integer[] tab) {
+        validateAverageInput(tab);
+
         int av = 0;
         for (float element : tab) {
             av += element;
@@ -59,5 +63,17 @@ public class Arrays {
             }
         }
         return min;
+    }
+
+    private static void validateAverageInput(Object[] tab) {
+        if (tab == null || tab.length == 0) {
+            throw new IllegalArgumentException("Input array must not be null or empty");
+        }
+    }
+
+    private static void validateAverageInput(float[] tab) {
+        if (tab == null || tab.length == 0) {
+            throw new IllegalArgumentException("Input array must not be null or empty");
+        }
     }
 }

@@ -32,7 +32,7 @@ public class BorderGuardAI implements PlayerInterface {
         for (Field field : fields) {
             if (!borders.contains(field) && field.getArmy() > 1) {
                 Field target = borders.isEmpty() ? fields.getWeak(game) : borders.getWeak(game);
-                field.move(target, field.getArmy() - 1);
+                game.maneuver(field, target, field.getArmy() - 1);
             }
         }
     }

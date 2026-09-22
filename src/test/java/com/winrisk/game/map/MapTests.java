@@ -5,7 +5,6 @@ import com.winrisk.game.data.Params;
 import com.winrisk.game.object.Field;
 import com.winrisk.game.util.PointF;
 import com.winrisk.game.serialization.MapSketch;
-import com.winrisk.game.view.GameSurface;
 import org.junit.Test;
 
 import java.io.File;
@@ -18,19 +17,6 @@ import java.util.Set;
 import static org.junit.Assert.*;
 
 public class MapTests {
-    @Test
-    public void mapDraw() throws Exception {
-        Map map = TestUtil.createNewGame().getMap();
-        GameSurface surface = new GameSurface() {
-            @Override public void drawBackground(byte[] b) {}
-            @Override public void drawLine(int x,int y,int x2,int y2) {}
-            @Override public void drawOval(int x,int y,int w,int h) {}
-            @Override public void drawString(String s,int x,int y) {}
-            @Override public void setColor(java.awt.Color c) {}
-        };
-        map.draw(surface, null);
-    }
-
     @Test
     public void mapSketchEquality() {
         Map map = new Map();

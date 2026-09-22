@@ -19,21 +19,31 @@ public class Play {
     }
 
     public Player play() {
-        System.setProperty("java.awt.headless", "true");
+        return playResult().getWinner();
+    }
+
+    public Result playResult() {
         if (maxTurns <= 0) {
             throw new IllegalStateException(
                     "Game did not finish within " + maxTurns + " turns");
         }
         Game game = new Game(params);
-        int turns = 0;
+        int completedTurns = 0;
+        int phaseSteps = 0;
+        int maxPhaseSteps = maxTurns * Math.max(1, game.getPlayers().size()) * 3;
         while (!game.end()) {
-            if (turns++ >= maxTurns) {
-                throw new IllegalStateException(
-                        "Game did not finish within " + maxTurns + " turns");
+            if (phaseSteps++ >= maxPhaseSteps) {
+                // No player achieved a win condition within the turn limit:
+                // report a draw rather than crashing the simulation.
+                return new Result(params, completedTurns, null,
+                        "draw: reached the turn limit of " + maxTurns + " turns");
             }
-            game.onAction();
+            if (game.getPhase() == com.winrisk.game.data.GamePhase.MOVE) {
+                completedTurns++;
+            }
+            game.next();
         }
-        return getWinner(game);
+        return new Result(params, completedTurns, getWinner(game), game.getWinReason());
     }
 
     public static Player playHeadless(Params params) {
@@ -43,7 +53,7 @@ public class Play {
     public static Player playWithDefaults() {
         Params params = new Params();
         params.setHumanPlayers(0);
-        params.setAiPlayers(6);
+        params.setAiPlayers(3);
         return playHeadless(params);
     }
 
@@ -52,6 +62,56 @@ public class Play {
     }
 
     public static void main(String[] args) {
-        playWithDefaults();
+        Params params = new Params();
+        params.setHumanPlayers(0);
+        params.setAiPlayers(3);
+        Result result = new Play(params).playResult();
+        System.out.println(result.toReport());
+    }
+
+    public static class Result {
+        private final Params params;
+        private final int turns;
+        private final Player winner;
+        private final String winReason;
+
+        Result(Params params, int turns, Player winner, String winReason) {
+            this.params = params;
+            this.turns = turns;
+            this.winner = winner;
+            this.winReason = winReason;
+        }
+
+        public Params getParams() {
+            return params;
+        }
+
+        public int getTurns() {
+            return turns;
+        }
+
+        public Player getWinner() {
+            return winner;
+        }
+
+        /**
+         * @return {@code true} when the game ended without a winner because the
+         * turn limit was reached (a stalemate/draw).
+         */
+        public boolean isDraw() {
+            return winner == null;
+        }
+
+        public String getWinReason() {
+            return winReason;
+        }
+
+        public String toReport() {
+            return "mode=" + params.getGameMode().toCliValue()
+                    + ", seed=" + (params.getRandomSeed() == null ? "random" : params.getRandomSeed())
+                    + ", turns=" + turns
+                    + ", winner=" + (winner == null ? "none" : winner.getColor())
+                    + ", reason=" + winReason;
+        }
     }
 }
