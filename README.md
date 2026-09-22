@@ -1,102 +1,169 @@
 # WinRisk
 
-WinRisk is a personal full-stack engineering project built around a turn-based territory-control game. It combines a **pure Java game engine**, a **Spring Boot** server and a **React + TypeScript** single-page client.
+WinRisk is being migrated to a single-process **C++20 + Qt 6 Qt Quick** application. The native client contains the game engine directly: there is no Spring Boot server, REST API, WebSocket transport, React frontend, browser, or WebView in the new runtime.
 
-The project is primarily an exercise in preserving a non-trivial domain model while evolving the delivery architecture: the original desktop application was separated from its UI, made headless-capable, exposed through a concurrent web service, and connected to a real-time browser client.
+## Current Qt milestone
 
-## Engineering highlights
+The `qt-cpp` implementation already contains:
 
-- Java game engine kept independent from the web layer
-- Spring Boot REST API with explicit validation and error mapping
-- multiple concurrent game sessions with per-game synchronization
-- monotonically versioned game state to handle reordered real-time messages
-- STOMP/WebSocket updates for live AI turns
-- React + TypeScript SPA built into the same deployable Spring Boot JAR
-- deterministic headless simulations for testing and experimentation
-- save/load support and multiple built-in/procedural maps
-- JUnit test suites, integration tests and a JaCoCo coverage gate
-- CI that builds the backend and frontend and smoke-tests the packaged application
+- pure C++20 engine with no Qt dependency
+- standard 42-territory / 83-edge world topology and continent bonuses
+- deterministic xoshiro-family native RNG with serialized state
+- Classic mode for 2–5 real players
+- official two-player Classic Neutral setup with 14 territories and 40 initial armies per real/neutral cluster
+- Secret Mission mode for 3–5 players with Java mission semantics
+- Capital mode for 3–5 players with original-HQ victory semantics
+- Java-compatible highest-die starting player and map-order claim setup for 3–5 player Classic/Capital games
+- territory, fortified-territory, continent and elimination mission victory checks
+- Capital HQ assignment, HQ-card exclusion, board markers and capture-all-HQs victory checks
+- reinforcement, Risk dice combat, capture/elimination and connected fortification
+- deterministic 44-card Risk deck, conquest awards, elimination transfer and Java-compatible wildcard sets
+- progressive card trades, forced trades and immediate post-elimination trades
+- all seven recovered Java options: incremental cards, expanded maneuver, attack-card reroll, commander die, attack-with-all, fog-of-war and Skynet
+- all five Java AI strategies: Easy, Continent, Balanced, BorderGuard and Random
+- Java-compatible AI strategy assignment by absolute seat index and persistence of strategy identity in native saves
+- Java `Field.getScale()` behavior: graph-distance decay, owner-relative fog visibility and Skynet interactive-player weighting
+- Java AI card-trade behavior: automatic trades are forced-only unless an explicit human trade action is made
+- Java-compatible Skynet semantics, including the original two-player Neutral quirk described below
+- viewer-aware fog-of-war with hidden owner/army/HQ data redacted before QML receives it
+- asynchronous AI scheduling with one Java-equivalent strategy phase per Qt timer tick
+- Qt `QAbstractListModel` presentation layer
+- responsive Qt Quick desktop/tablet/phone v6 UI with mode/rule selection, mission/objective HUD and HQ badges
+- native quick-save/load using versioned JSON schema v6
+- migration of native schema-v2/v3/v4/v5 saves to v6
+- current Java Gson `GameSketch` import for Classic, Secret Mission and Capital on the standard world map
+- CTest engine, AI-strategy, fog-model and Java-import regression suites
+- CI definitions for Windows, Linux, macOS, Android, iOS and WebAssembly
+
+The legacy Java/Spring/React source remains on this migration branch only as a behavior and format reference. It is not linked into the C++ application and will be removed after the remaining parity gates pass.
+
+## Requirements
+
+- CMake 3.24+
+- C++20 compiler
+- Qt 6.10+ with Core, Gui, Qml, Quick and QuickControls2
+- Ninja recommended
+
+Linux, macOS, Android, iOS and WebAssembly CI use Qt 6.11.1. Windows currently targets Qt 6.10.3; the application does not depend on 6.11-only APIs.
+
+## Desktop build
+
+```bash
+cmake --preset default
+cmake --build --preset default
+ctest --preset default
+```
+
+The root CMake project builds the authoritative v6 engine/controller/QML shell. The standalone `v6/` project builds the same source set:
+
+```bash
+cmake -S v6 -B build/v6 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+cmake --build build/v6 --parallel
+ctest --test-dir build/v6 --output-on-failure
+```
+
+## Android build
+
+```bash
+qt-cmake -S v6 -B build/android -GNinja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
+  -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+cmake --build build/android --target winrisk_app
+"$QT_HOST_PATH/bin/androiddeployqt" \
+  --input "$PWD/build/android/android-winrisk_app-deployment-settings.json" \
+  --output "$PWD/build/android/android-build" \
+  --apk "$PWD/WinRisk-android-arm64.apk"
+```
+
+The application is native Qt/C++; it does not require a WinRisk server or network connection.
 
 ## Architecture
 
 ```text
-React + TypeScript SPA
-        |
-        | REST commands
-        | STOMP/WebSocket state updates
-        v
-Spring Boot web layer
-        |
-        | synchronized game sessions
-        v
-Pure Java game engine
-        |
-        +-- rules and turn flow
-        +-- AI players
-        +-- maps and missions
-        +-- serialization
-        +-- headless simulation
+QML / Qt Quick
+      |
+AppController + BoardModel
+      |
+Pure C++ GameEngine
 ```
 
-The browser sends commands through REST. State changes are broadcast over `/topic/games/{id}` through the STOMP endpoint at `/ws`. The client rejects stale versions, allowing broadcasts to occur outside the game-session lock without making message arrival order part of the consistency model.
+The engine is command-driven and does not expose mutable state to QML. UI actions call engine operations for reinforcement, cards, attack, maneuver and phase progression. AI uses the same operations and is scheduled asynchronously from Qt.
 
-## Build and run
+## Java AI parity
 
-Requirements:
+The native engine preserves the five AI controllers exposed by Java `PlayerFactory`:
 
-- Java 17+
-- Node.js 22+ for building/serving the web client
+- **EasyAI:** reinforces the weakest scale position, repeatedly attacks sufficiently weaker adjacent targets, and moves armies from the strongest position toward the weakest border. Under Skynet it restricts a source's candidates to Java-"interactive" adjacent enemies when any exist.
+- **ContinentAI:** keeps a continent goal until that continent is owned, chooses the unowned continent with the greatest current player share, attacks in average-proximity-to-goal order and reinforces owned goal fields. Its Java behavior can leave reinforcement points unused and still advance phase; the native parity implementation intentionally preserves that quirk.
+- **BalancedAI:** concentrates reinforcement on the weakest border, makes one pass over scale-sorted border attacks using the Java strength threshold, then moves interior armies toward the weakest border.
+- **BorderGuardAI:** concentrates reinforcement on the weakest border, attacks only when a border has more than twice the target's armies, and moves interior armies toward weak borders.
+- **RandomAI:** distributes reinforcements randomly, makes one random border attack and attempts one random maneuver.
 
-```bash
-./gradlew build
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar
-```
+The common Java scale function is also reproduced. For a territory, armies are weighted by `1 / 2^graphDistance`; friendly and enemy weights are accumulated to produce `enemy / friendly`. With fog enabled, Java evaluates only the **owner of that territory's** visible fields (owned fields plus immediate neighbors), not a single global viewer.
 
-Open `http://localhost:8080`.
+Java's Skynet implementation has a non-obvious two-player quirk: Neutral is controlled by the unannotated `PlayerAI`, and Java `PlayerInterface.isInteractive()` therefore returns `true` for Neutral. Consequently EasyAI's Skynet target filter and `Field.getScale()` both treat Neutral as interactive alongside human players. The native compatibility implementation preserves this behavior rather than silently normalizing it.
 
-For frontend development:
+`PlayerFactory.getDefaultAI(index)` uses the absolute player-seat index modulo the five AI strategies. The C++ setup uses the same rule. For example, with one human in seat 0, AI seats 1–4 are Continent, Balanced, BorderGuard and Random respectively.
 
-```bash
-./gradlew bootRun
-cd frontend
-npm install
-npm run dev
-```
+AI strategy identity is persisted in native schema-v6 saves and reconstructed from Java `GameSketch.PlayerData.interfaceClass` when importing current Java saves. ContinentAI's goal itself is transient, matching Java's non-serialized AI-object state, so it is recalculated after load.
 
-The Vite development server runs on port `5173` and proxies the API to the backend on port `8080`.
+## Optional rules
 
-Use `-PskipFrontend` when a backend-only JAR is sufficient.
+The v6 engine currently preserves these recovered Java semantics:
 
-## Headless simulation
+- **Incremental cards:** trade value is `4 + completed trades`.
+- **Expanded maneuver:** multiple friendly connected routes may be used in one maneuver phase.
+- **Attack-card reroll:** a matching non-wild source/target card may improve the lowest attack die; the card is not consumed.
+- **Commander die:** once per turn the lowest attack die becomes 6 after the card reroll.
+- **Attack with all:** repeat battles until capture or until the source cannot continue attacking.
+- **Fog of war:** a human viewer sees owned territories and immediate neighbors; hidden ownership, armies and HQ state are redacted in the Qt model. AI scale calculations separately preserve Java's owner-relative visibility behavior.
+- **Skynet:** EasyAI prefers adjacent Java-interactive targets, and scale calculations double the weight of Java-interactive fields. In the Java implementation this includes human players and the two-player Neutral controller.
 
-The same application can run AI-only games without starting the server:
+## Persistence
 
-```bash
-java -jar build/libs/WinRisk-1.0-SNAPSHOT.jar --headless-play \
-    --map=pangaea --ai-players=4 --seed=42 --mode=classic
-```
+Native saves use JSON schema version 6 and contain the game mode, seven rule flags, stable player/territory/card IDs, AI strategy identity, Secret Mission objectives, Capital headquarters, deck/discard state, trade progression, commander-die state, maneuver state and complete native RNG state. They do not serialize C++ object layouts or pointers.
 
-Supported options include built-in/custom maps, game modes, deterministic seeds, turn limits and optional rules.
+Native schema-v2 through schema-v5 saves remain loadable. Pre-v6 saves explicitly disable fog and Skynet because those fields did not exist in those schemas. Early native schema-v6 saves that predate `aiStrategy` remain readable and default a missing strategy field to Easy.
 
-## Gameplay scope
+### Current Java JSON import
 
-The implementation supports solo play against AI opponents, multiple game modes, saved games, custom maps and several optional rules. Built-in boards include a classic world layout plus Pangaea, Laurasia, Gondwana and Rodinia, along with procedurally generated maps.
+The loader imports the current Java Gson `GameSketch` format when the save uses the standard 42-territory world map. `GameSketch.ParamsData` stores the four `RulesOptions` booleans **flattened** alongside the other parameters; the converter imports those values plus `attackWithAll`, `fogOfWar` and `skynetMode`.
 
-## Repository structure
+For current Java JSON saves the converter preserves:
 
-- `src/main/java/com/winrisk/game` — domain model, rules, AI, maps, missions and serialization
-- `src/main/java/com/winrisk/web` — Spring Boot API, sessions, WebSocket broadcasting and AI scheduling
-- `frontend/` — React + TypeScript SPA built with Vite
-- `src/test/java` — engine, service, controller and integration tests
+- Classic, Secret Mission and Capital mode
+- two-player Classic Neutral ownership
+- player colors, human/AI classification, exact supported AI strategy class and reinforcements
+- territory owners and armies
+- Secret Mission specifications and elimination targets
+- Capital headquarters
+- all seven rule flags
+- commander-die and maneuver-used state
+- trade count and conquest-card state for the current player
+- player card hands
+- draw pile and discard pile
+- Java draw order (`GameSketch.drawPile` is next-card-first and is reversed for the native back-of-vector draw convention)
+- the two wild cards as distinct native card IDs
+- signed 64-bit `randomSeed` text without routing it through JSON-double precision
 
-## Quality gates
+Unsupported active Java AI controller classes are rejected rather than silently substituted with a different strategy. Neutral's Java `PlayerAI` controller remains supported through the dedicated Neutral path.
 
-`./gradlew build` runs the automated test suite and JaCoCo verification. The CI pipeline also packages the SPA into the boot JAR, starts the resulting artifact and smoke-tests both the API and served frontend.
+The standard-world Java card symbols map directly to the native deck because both use Infantry/Cavalry/Artillery by territory index modulo 3.
 
-## Project status
+A Java save does **not** contain the progressed internal state of `java.util.Random`; Java's own `Game.fromSketch()` recreates `Random` from the original `randomSeed`. The converter therefore preserves the serialized game state and derives the native RNG from the stored seed when available, but does not claim that future native dice rolls are bit-for-bit identical to Java's RNG stream.
 
-Active personal project. The current web architecture replaced an earlier Swing client while retaining the underlying engine and save compatibility. The repository includes historical evolution in Git so architectural changes can be inspected rather than presented only as a finished snapshot.
+Java also stores `maneuverUsed` without its source/destination route. The native engine represents that imported state as a consumed-fortification sentinel, matching Java's post-load behavior: no new standard fortification route may be started that turn.
 
-## Naming
+## Remaining Java parity work
 
-This is an unofficial personal software-engineering project and is not presented as an official implementation or product of any commercial board-game publisher.
+Remaining migration work is now concentrated in:
+
+- historical, custom and procedural maps
+- old Java ObjectStream save/map conversion
+- replay/action log
+- production signing/store packaging for Android and iOS
+
+Once those parity gates pass, the legacy Java, Spring Boot, React, Gradle and abandoned libGDX migration code can be deleted.

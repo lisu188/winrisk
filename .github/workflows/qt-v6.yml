@@ -1,0 +1,193 @@
+name: Qt v6
+
+on:
+  push:
+    branches:
+      - qt-cpp
+      - main
+    paths:
+      - 'v6/**'
+      - 'CMakeLists.txt'
+      - 'src/engine/**'
+      - 'src/qt/AppControllerV6.cpp'
+      - 'src/qt/AppController.hpp'
+      - 'src/qt/LegacyJavaImporter.cpp'
+      - 'src/qt/LegacyJavaImporter.hpp'
+      - 'src/app/main_v6.cpp'
+      - 'qml/MainV6.qml'
+      - 'qml/screens/MainMenuV6.qml'
+      - 'qml/screens/GameScreenV6.qml'
+      - 'qml/components/BoardPaneV6.qml'
+      - 'qml/components/ControlPanel.qml'
+      - 'tests/**'
+      - 'platform/android/**'
+      - '.github/workflows/qt-v6.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v6/**'
+      - 'CMakeLists.txt'
+      - 'src/engine/**'
+      - 'src/qt/AppControllerV6.cpp'
+      - 'src/qt/AppController.hpp'
+      - 'src/qt/LegacyJavaImporter.cpp'
+      - 'src/qt/LegacyJavaImporter.hpp'
+      - 'src/app/main_v6.cpp'
+      - 'qml/MainV6.qml'
+      - 'qml/screens/MainMenuV6.qml'
+      - 'qml/screens/GameScreenV6.qml'
+      - 'qml/components/BoardPaneV6.qml'
+      - 'qml/components/ControlPanel.qml'
+      - 'tests/**'
+      - 'platform/android/**'
+      - '.github/workflows/qt-v6.yml'
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.os }} / Qt ${{ matrix.qt }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            qt: '6.11.1'
+          - os: windows-2025
+            qt: '6.10.3'
+          - os: macos-15
+            qt: '6.11.1'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          cache: true
+
+      - name: Configure v6
+        run: cmake -S v6 -B build/v6 -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+
+      - name: Build v6
+        run: cmake --build build/v6 --config Release --parallel
+
+      - name: Test v6
+        run: ctest --test-dir build/v6 -C Release --output-on-failure
+
+  android:
+    name: Android arm64 v6
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and NDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+          cache: true
+
+      - name: Configure Android v6
+        run: >-
+          qt-cmake -S v6 -B build/v6-android -GNinja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DANDROID_ABI=arm64-v8a
+          -DANDROID_PLATFORM=android-28
+          -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          -DANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+
+      - name: Build native Android target
+        run: cmake --build build/v6-android --target winrisk_app --parallel
+
+      - name: Package debug APK
+        run: >-
+          "$QT_HOST_PATH/bin/androiddeployqt"
+          --input "$PWD/build/v6-android/android-winrisk_app-deployment-settings.json"
+          --output "$PWD/build/v6-android/android-build"
+          --apk "$PWD/WinRisk-android-arm64-v6.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-android-arm64-v6
+          path: WinRisk-android-arm64-v6.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS arm64 v6 compile
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: mac
+          target: ios
+          cache: true
+
+      - name: Configure iOS v6
+        run: >-
+          qt-cmake -S v6 -B build/v6-ios -GXcode
+          -DBUILD_TESTING=OFF
+          -DCMAKE_OSX_SYSROOT=iphoneos
+
+      - name: Build iOS v6
+        run: cmake --build build/v6-ios --config Release --target winrisk_app -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+
+  wasm:
+    name: WebAssembly v6 single-thread
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten 4.0.7
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.7
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: all_os
+          target: wasm
+          arch: wasm_singlethread
+          cache: true
+
+      - name: Configure WebAssembly v6
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake -S v6 -B build/v6-wasm -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_TOOLCHAIN_FILE="$QT_ROOT_DIR/lib/cmake/Qt6/qt.toolchain.cmake"
+
+      - name: Build WebAssembly v6
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --build build/v6-wasm --parallel
+
+      - name: Collect WebAssembly v6
+        run: |
+          mkdir -p WinRisk-web-v6
+          find build/v6-wasm -maxdepth 3 -type f \( -name '*.html' -o -name '*.js' -o -name '*.wasm' -o -name '*.data' \) -exec cp {} WinRisk-web-v6/ \;
+          test -n "$(find WinRisk-web-v6 -type f -name '*.wasm' -print -quit)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-webassembly-v6
+          path: WinRisk-web-v6
+          if-no-files-found: error

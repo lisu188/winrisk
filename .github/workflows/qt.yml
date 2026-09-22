@@ -1,0 +1,179 @@
+name: Qt C++
+
+on:
+  push:
+    branches:
+      - qt-cpp
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'src/engine/**'
+      - 'src/qt/**'
+      - 'src/app/**'
+      - 'qml/**'
+      - 'platform/**'
+      - 'tests/**'
+      - '.github/workflows/qt.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'src/engine/**'
+      - 'src/qt/**'
+      - 'src/app/**'
+      - 'qml/**'
+      - 'platform/**'
+      - 'tests/**'
+      - '.github/workflows/qt.yml'
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.os }} / Qt ${{ matrix.qt }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            qt: '6.11.1'
+          - os: windows-2025
+            qt: '6.10.3'
+          - os: macos-15
+            qt: '6.11.1'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt }}
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build/qt -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+
+      - name: Build
+        run: cmake --build build/qt --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build/qt -C Release --output-on-failure
+
+  android:
+    name: Android arm64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and NDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+          cache: true
+
+      - name: Configure Android
+        run: >-
+          qt-cmake -S . -B build/android -GNinja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=OFF
+          -DANDROID_ABI=arm64-v8a
+          -DANDROID_PLATFORM=android-28
+          -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          -DANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/27.2.12479018"
+
+      - name: Build native Android target
+        run: cmake --build build/android --target winrisk_app --parallel
+
+      - name: Package debug-signed APK
+        run: >-
+          "$QT_HOST_PATH/bin/androiddeployqt"
+          --input "$GITHUB_WORKSPACE/build/android/android-winrisk_app-deployment-settings.json"
+          --output "$GITHUB_WORKSPACE/build/android/android-build"
+          --apk "$GITHUB_WORKSPACE/WinRisk-android-arm64.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-android-arm64
+          path: WinRisk-android-arm64.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS arm64 compile
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: mac
+          target: ios
+          cache: true
+
+      - name: Configure iOS
+        run: >-
+          qt-cmake -S . -B build/ios -GXcode
+          -DBUILD_TESTING=OFF
+          -DCMAKE_OSX_SYSROOT=iphoneos
+
+      - name: Build iOS
+        run: cmake --build build/ios --config Release --target winrisk_app -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO
+
+  wasm:
+    name: WebAssembly single-thread
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Emscripten 4.0.7
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 4.0.7
+          "$RUNNER_TEMP/emsdk/emsdk" activate 4.0.7
+
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: all_os
+          target: wasm
+          arch: wasm_singlethread
+          cache: true
+
+      - name: Configure WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake -S . -B build/wasm -GNinja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_TOOLCHAIN_FILE="$QT_ROOT_DIR/lib/cmake/Qt6/qt.toolchain.cmake"
+
+      - name: Build WebAssembly
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          cmake --build build/wasm --parallel
+
+      - name: Collect WebAssembly
+        run: |
+          mkdir -p WinRisk-web
+          find build/wasm -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.wasm' -o -name '*.data' \) -exec cp {} WinRisk-web/ \;
+          test -n "$(find WinRisk-web -type f -name '*.wasm' -print -quit)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinRisk-webassembly
+          path: WinRisk-web
+          if-no-files-found: error

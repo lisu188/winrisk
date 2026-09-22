@@ -1,0 +1,135 @@
+cmake_minimum_required(VERSION 3.24)
+
+project(WinRiskV6 VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+set(WINRISK_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
+
+find_package(Qt6 6.10 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+qt_standard_project_setup(REQUIRES 6.10)
+
+add_library(winrisk_engine STATIC
+    "${WINRISK_ROOT}/src/engine/GameEngineCore.cpp"
+    "${WINRISK_ROOT}/src/engine/WorldMap.cpp"
+    "${WINRISK_ROOT}/src/engine/BuiltinMaps.cpp"
+    "${WINRISK_ROOT}/src/engine/ProceduralMap.cpp"
+    "${WINRISK_ROOT}/src/engine/MissionRules.cpp"
+    "${WINRISK_ROOT}/src/engine/CapitalRules.cpp"
+    "${WINRISK_ROOT}/src/engine/TwoPlayerRules.cpp"
+    "${WINRISK_ROOT}/src/engine/CombatRules.cpp"
+    "${WINRISK_ROOT}/src/engine/AiIdentity.cpp"
+    "${WINRISK_ROOT}/src/engine/AiStrategies.cpp"
+)
+
+target_include_directories(winrisk_engine PUBLIC "${WINRISK_ROOT}/src")
+target_compile_features(winrisk_engine PUBLIC cxx_std_20)
+
+add_library(winrisk_qt STATIC
+    "${WINRISK_ROOT}/src/qt/AppControllerV6.cpp"
+    "${WINRISK_ROOT}/src/qt/LegacyJavaImporter.cpp"
+)
+
+target_include_directories(winrisk_qt PUBLIC "${WINRISK_ROOT}/src")
+target_link_libraries(winrisk_qt PUBLIC winrisk_engine Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+
+qt_add_executable(winrisk_app
+    "${WINRISK_ROOT}/src/app/main_v6.cpp"
+)
+
+set(V6_QML_FILES
+    "${WINRISK_ROOT}/qml/MainV6.qml"
+    "${WINRISK_ROOT}/qml/screens/MainMenuV6.qml"
+    "${WINRISK_ROOT}/qml/screens/GameScreenV6.qml"
+    "${WINRISK_ROOT}/qml/components/BoardPaneV6.qml"
+    "${WINRISK_ROOT}/qml/components/ControlPanel.qml"
+)
+
+set_source_files_properties("${WINRISK_ROOT}/qml/MainV6.qml" PROPERTIES QT_RESOURCE_ALIAS "MainV6.qml")
+set_source_files_properties("${WINRISK_ROOT}/qml/screens/MainMenuV6.qml" PROPERTIES QT_RESOURCE_ALIAS "MainMenuV6.qml")
+set_source_files_properties("${WINRISK_ROOT}/qml/screens/GameScreenV6.qml" PROPERTIES QT_RESOURCE_ALIAS "GameScreenV6.qml")
+set_source_files_properties("${WINRISK_ROOT}/qml/components/BoardPaneV6.qml" PROPERTIES QT_RESOURCE_ALIAS "BoardPaneV6.qml")
+set_source_files_properties("${WINRISK_ROOT}/qml/components/ControlPanel.qml" PROPERTIES QT_RESOURCE_ALIAS "ControlPanel.qml")
+
+qt_add_qml_module(winrisk_app
+    URI WinRisk
+    VERSION 1.0
+    QML_FILES ${V6_QML_FILES}
+)
+
+target_link_libraries(winrisk_app PRIVATE winrisk_qt Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+
+set_target_properties(winrisk_app PROPERTIES
+    WIN32_EXECUTABLE TRUE
+    MACOSX_BUNDLE TRUE
+    MACOSX_BUNDLE_BUNDLE_NAME WinRisk
+    MACOSX_BUNDLE_GUI_IDENTIFIER com.winrisk.game
+    QT_ANDROID_PACKAGE_NAME com.winrisk.game
+)
+
+if(ANDROID)
+    set_target_properties(winrisk_app PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${WINRISK_ROOT}/platform/android"
+        QT_ANDROID_MIN_SDK_VERSION 28
+        QT_ANDROID_TARGET_SDK_VERSION 36
+        QT_ANDROID_COMPILE_SDK_VERSION 36
+        QT_ANDROID_VERSION_NAME "${PROJECT_VERSION}"
+        QT_ANDROID_VERSION_CODE 1
+    )
+endif()
+
+if(EMSCRIPTEN)
+    set_target_properties(winrisk_app PROPERTIES
+        QT_WASM_INITIAL_MEMORY "96MB"
+    )
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(winrisk_engine_tests "${WINRISK_ROOT}/tests/engine_tests_v6.cpp")
+    target_link_libraries(winrisk_engine_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_engine_tests COMMAND winrisk_engine_tests)
+
+    add_executable(winrisk_ai_strategy_tests "${WINRISK_ROOT}/tests/ai_strategy_tests.cpp")
+    target_link_libraries(winrisk_ai_strategy_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_ai_strategy_tests COMMAND winrisk_ai_strategy_tests)
+
+    add_executable(winrisk_builtin_map_tests "${WINRISK_ROOT}/tests/builtin_map_tests.cpp")
+    target_link_libraries(winrisk_builtin_map_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_builtin_map_tests COMMAND winrisk_builtin_map_tests)
+
+    add_executable(winrisk_procedural_map_tests "${WINRISK_ROOT}/tests/procedural_map_tests.cpp")
+    target_link_libraries(winrisk_procedural_map_tests PRIVATE winrisk_engine)
+    add_test(NAME winrisk_procedural_map_tests COMMAND winrisk_procedural_map_tests)
+
+    add_executable(winrisk_fog_model_tests "${WINRISK_ROOT}/tests/fog_model_tests.cpp")
+    target_link_libraries(winrisk_fog_model_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_fog_model_tests COMMAND winrisk_fog_model_tests)
+
+    add_executable(winrisk_legacy_import_tests "${WINRISK_ROOT}/tests/legacy_java_import_tests.cpp")
+    target_link_libraries(winrisk_legacy_import_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_legacy_import_tests COMMAND winrisk_legacy_import_tests)
+
+    add_executable(winrisk_legacy_import_edge_tests "${WINRISK_ROOT}/tests/legacy_java_import_edge_tests.cpp")
+    target_link_libraries(winrisk_legacy_import_edge_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_legacy_import_edge_tests COMMAND winrisk_legacy_import_edge_tests)
+
+    add_executable(winrisk_ai_identity_import_tests "${WINRISK_ROOT}/tests/ai_identity_import_tests.cpp")
+    target_link_libraries(winrisk_ai_identity_import_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_ai_identity_import_tests COMMAND winrisk_ai_identity_import_tests)
+
+    add_executable(winrisk_historical_java_import_tests "${WINRISK_ROOT}/tests/historical_java_import_tests.cpp")
+    target_link_libraries(winrisk_historical_java_import_tests PRIVATE winrisk_qt Qt6::Core)
+    add_test(NAME winrisk_historical_java_import_tests COMMAND winrisk_historical_java_import_tests)
+endif()
+
+install(TARGETS winrisk_app
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+)

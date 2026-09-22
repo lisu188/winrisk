@@ -1,0 +1,253 @@
+#pragma once
+
+#include <array>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace winrisk {
+
+enum class Phase { Reinforce = 0, Attack = 1, Maneuver = 2, Finished = 3 };
+enum class GameMode { Classic = 0, SecretMission = 1, Capital = 2 };
+enum class CardType { Infantry = 0, Cavalry = 1, Artillery = 2, Wild = 3 };
+enum class MissionKind { Territory = 0, FortifiedTerritory = 1, Continents = 2, Elimination = 3 };
+enum class AiStrategy { Easy = 0, Continent = 1, Balanced = 2, BorderGuard = 3, Random = 4 };
+
+struct MissionSpec {
+    MissionKind kind = MissionKind::Territory;
+    int territories = 0;
+    int minimumArmies = 0;
+    int continentCount = 0;
+    int eliminationTarget = -1;
+};
+
+struct RulesOptions {
+    bool incrementalCardSetValues = false;
+    bool expandedManeuver = false;
+    bool attackCardReroll = false;
+    bool commanderDie = false;
+    bool attackWithAll = false;
+    bool fogOfWar = false;
+    bool skynet = false;
+};
+
+struct Card { int id = -1; CardType type = CardType::Infantry; int territoryId = -1; };
+
+struct Territory {
+    int id = -1;
+    std::string name;
+    float x = 0.0f;
+    float y = 0.0f;
+    int continent = -1;
+    std::vector<int> adjacent;
+    int owner = -1;
+    int armies = 0;
+};
+
+struct Continent { int id = -1; std::string name; int bonus = 0; std::vector<int> territories; };
+
+struct MapDefinition {
+    std::string id;
+    std::string displayName;
+    std::vector<Territory> territories;
+    std::vector<Continent> continents;
+};
+
+struct Player {
+    int id = -1;
+    std::string name;
+    std::uint32_t color = 0xff808080u;
+    bool ai = false;
+    AiStrategy aiStrategy = AiStrategy::Easy;
+    bool neutral = false;
+    bool eliminated = false;
+    int reinforcements = 0;
+    std::vector<int> cards;
+    std::optional<MissionSpec> mission;
+    int headquarters = -1;
+};
+
+struct BattleResult {
+    bool legal = false;
+    bool captured = false;
+    int attackerLosses = 0;
+    int defenderLosses = 0;
+    std::vector<int> attackDice;
+    std::vector<int> defenseDice;
+};
+
+struct Snapshot {
+    int version = 6;
+    std::string mapId = "world";
+    GameMode mode = GameMode::Classic;
+    RulesOptions rules;
+    Phase phase = Phase::Reinforce;
+    int currentPlayer = 0;
+    int winner = -1;
+    std::uint64_t turn = 1;
+    std::array<std::uint64_t, 4> rngState{};
+    std::vector<Player> players;
+    std::vector<Territory> territories;
+    std::vector<Card> deck;
+    std::vector<Card> discard;
+    int tradeCount = 0;
+    bool conqueredThisTurn = false;
+    bool commanderDieUsed = false;
+    bool maneuverUsed = false;
+    int maneuverSource = -1;
+    int maneuverTarget = -1;
+};
+
+class Random {
+public:
+    explicit Random(std::uint64_t seed = 1);
+    std::uint64_t next();
+    int uniform(int upperExclusive);
+    const std::array<std::uint64_t, 4>& state() const;
+    void setState(const std::array<std::uint64_t, 4>& state);
+private:
+    std::array<std::uint64_t, 4> state_{};
+};
+
+class GameEngine {
+public:
+    GameEngine();
+    bool startNewGame(
+        int playerCount,
+        int humanPlayers,
+        std::uint64_t seed,
+        GameMode mode = GameMode::Classic,
+        RulesOptions rules = {},
+        const std::string& mapId = "world"
+    );
+    bool reinforce(int territoryId, int count = 1);
+    BattleResult attack(int sourceId, int targetId);
+    bool maneuver(int sourceId, int targetId, int troops = 1);
+    int tradeCards();
+    bool endPhase();
+    bool aiStep();
+
+    const std::vector<Territory>& territories() const;
+    const std::vector<Continent>& continents() const;
+    const std::vector<Player>& players() const;
+    const std::vector<Card>& deck() const;
+    const std::vector<Card>& discard() const;
+    const Player* currentPlayer() const;
+    const std::string& mapId() const;
+    GameMode mode() const;
+    const RulesOptions& rules() const;
+    bool commanderDieUsed() const;
+    Phase phase() const;
+    int currentPlayerId() const;
+    int winnerId() const;
+    std::uint64_t turn() const;
+    int tradeCount() const;
+    int nextTradeValue() const;
+    bool canTradeCards() const;
+    bool mustTradeCards() const;
+    bool running() const;
+    std::string missionText(int playerId) const;
+    int headquartersOwner(int territoryId) const;
+    int headquartersControlledBy(int playerId) const;
+    std::string capitalObjectiveText(int playerId) const;
+
+    bool canAttack(int sourceId, int targetId) const;
+    bool canManeuver(int sourceId, int targetId) const;
+    bool ownsConnectedPath(int sourceId, int targetId, int ownerId) const;
+
+    Snapshot snapshot() const;
+    bool restore(const Snapshot& snapshot);
+
+    static std::vector<Territory> makeWorldTerritories();
+    static std::vector<Continent> makeWorldContinents();
+    static std::optional<MapDefinition> makeBuiltinMap(const std::string& mapId);
+    static std::vector<std::string> builtinMapIds();
+    static MapDefinition generateProceduralMap(int fieldCount, int continentCount, std::uint64_t seed);
+    static std::string proceduralMapId(int fieldCount, int continentCount, std::uint64_t seed);
+    static std::optional<MapDefinition> makeMapDefinition(const std::string& mapId);
+    static std::vector<Card> makeRiskDeck(int territoryCount = 42);
+    static std::vector<MissionSpec> makeMissionDeck(int playerCount);
+    static std::string missionDescription(const MissionSpec& mission);
+    static std::string aiStrategyName(AiStrategy strategy);
+    static int startingTroops(int playerCount);
+    static int tradeValue(int completedTrades);
+
+private:
+    std::vector<Territory> territories_;
+    std::vector<Continent> continents_;
+    std::vector<Player> players_;
+    std::vector<Card> cardCatalog_;
+    std::vector<Card> deck_;
+    std::vector<Card> discard_;
+    std::vector<int> aiContinentGoals_;
+    Random random_;
+    std::string mapId_ = "world";
+    GameMode mode_ = GameMode::Classic;
+    RulesOptions rules_;
+    Phase phase_ = Phase::Finished;
+    int currentPlayer_ = 0;
+    int winner_ = -1;
+    std::uint64_t turn_ = 0;
+    int tradeCount_ = 0;
+    bool conqueredThisTurn_ = false;
+    bool commanderDieUsed_ = false;
+    bool maneuverUsed_ = false;
+    int maneuverSource_ = -1;
+    int maneuverTarget_ = -1;
+
+    void setupPlayers(int playerCount, int humanPlayers);
+    void addNeutralPlayer();
+    void assignMissions();
+    int rollHighestPlayer();
+    void distributeTerritories();
+    void claimTerritories(int startingPlayer);
+    void placeStartingTroops();
+    void placeStartingTroopsOfficial();
+    void placeTwoPlayerStartingTroops();
+    void assignHeadquarters();
+    void initializeDeck();
+    void removeHeadquartersFromDeck();
+    void shuffleCards(std::vector<Card>& cards);
+    void recycleDiscard();
+    void awardTurnCard();
+    void transferCards(int fromPlayer, int toPlayer);
+    int tradeCardsForPlayer(int playerId);
+    void tradeAfterElimination(int playerId);
+    BattleResult resolveOneBattle(int sourceId, int targetId);
+    void beginTurn();
+    void advancePlayer();
+    void updateEliminationsAndWinner();
+    bool missionCompleted(int playerId, const MissionSpec& mission) const;
+    int capitalWinner() const;
+    int reinforcementCount(int playerId) const;
+    int territoryCount(int playerId) const;
+    bool ownsContinent(int playerId, const Continent& continent) const;
+    bool validTerritory(int id) const;
+    bool isAdjacent(int sourceId, int targetId) const;
+
+    bool runAiReinforcePhase();
+    void runAiAttackPhase();
+    void runAiManeuverPhase();
+    std::vector<int> ownedTerritoryIds(int playerId) const;
+    std::vector<int> borderTerritoryIds(int playerId) const;
+    std::vector<int> enemyTerritoryIds(int sourceId) const;
+    std::vector<int> visibleTerritoryIds(int playerId) const;
+    int graphDistance(int sourceId, int targetId) const;
+    double fieldScale(int territoryId) const;
+    void sortByScale(std::vector<int>& territoryIds) const;
+    int strongestByScale(const std::vector<int>& territoryIds) const;
+    int weakestByScale(const std::vector<int>& territoryIds) const;
+    int continentGoalFor(int playerId);
+    double averageProximityToContinent(int territoryId, int continentId) const;
+    bool javaInteractivePlayer(int playerId) const;
+
+    std::optional<std::array<std::size_t, 3>> findTradeSet(const Player& player) const;
+    const Card* findCard(int cardId) const;
+};
+
+std::string phaseName(Phase phase);
+std::string modeName(GameMode mode);
+std::string cardTypeName(CardType type);
+
+}
