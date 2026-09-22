@@ -1,0 +1,135 @@
+html,
+body,
+#root {
+    width: 100%;
+}
+
+body {
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+canvas {
+    touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+    .btn,
+    button,
+    input[type='text'],
+    input[type='number'],
+    select {
+        min-height: 44px;
+    }
+
+    input[type='checkbox'],
+    input[type='radio'] {
+        width: 22px;
+        height: 22px;
+    }
+
+    .btn-small {
+        min-height: 40px;
+        padding: 0.45rem 0.75rem;
+    }
+
+    .card {
+        min-height: 48px;
+        padding: 0.55rem 0.65rem;
+    }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+    .game-screen {
+        flex-direction: column;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .board-wrap {
+        flex: 0 0 60vh;
+        flex-basis: 60dvh;
+        width: 100%;
+        min-height: 360px;
+    }
+
+    .hud {
+        width: 100%;
+        flex-shrink: 0;
+        overflow: visible;
+        border-left: 0;
+        border-top: 1px solid rgba(0, 0, 0, 0.35);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+        padding: 0.75rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .toast-stack {
+        width: calc(100% - 1rem);
+        bottom: max(0.5rem, env(safe-area-inset-bottom));
+    }
+
+    .toast {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+    .hud {
+        width: 260px;
+        padding: 0.65rem;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        font-size: 14px;
+    }
+
+    .lobby {
+        padding: 1rem 0.65rem 2rem;
+    }
+
+    .lobby-header {
+        margin-bottom: 1rem;
+    }
+
+    .lobby-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .panel {
+        padding: 0.75rem;
+    }
+
+    .form-row {
+        align-items: stretch;
+    }
+
+    .form-row label {
+        min-width: 100%;
+    }
+
+    .form-row input[type='text'],
+    .form-row input[type='number'],
+    .form-row select {
+        width: 100%;
+    }
+
+    .game-list li {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .game-list li .btn-row {
+        width: 100%;
+    }
+
+    .game-list li .btn {
+        flex: 1;
+    }
+}
