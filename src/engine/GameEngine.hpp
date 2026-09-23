@@ -80,6 +80,7 @@ struct BattleResult {
 struct Snapshot {
     int version = 6;
     std::string mapId = "world";
+    std::optional<MapDefinition> mapDefinition;
     GameMode mode = GameMode::Classic;
     RulesOptions rules;
     Phase phase = Phase::Reinforce;
@@ -135,6 +136,7 @@ public:
     const std::vector<Card>& discard() const;
     const Player* currentPlayer() const;
     const std::string& mapId() const;
+    const std::string& mapDisplayName() const;
     GameMode mode() const;
     const RulesOptions& rules() const;
     bool commanderDieUsed() const;
@@ -183,6 +185,7 @@ private:
     std::vector<int> aiContinentGoals_;
     Random random_;
     std::string mapId_ = "world";
+    std::string mapDisplayName_ = "World";
     GameMode mode_ = GameMode::Classic;
     RulesOptions rules_;
     Phase phase_ = Phase::Finished;
