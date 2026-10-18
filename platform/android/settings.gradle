@@ -6,4 +6,5 @@ pluginManagement {
     }
 }
 
-rootProject.name = "WinRisk"
+// androiddeployqt locates the APK using the deployment directory basename.
+rootProject.name = settingsDir.name
