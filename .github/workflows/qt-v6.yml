@@ -102,7 +102,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.1'
-          host: linux
+          host: all_os
           target: android
           arch: android_arm64_v8a
           cache: true
@@ -123,7 +123,7 @@ jobs:
       - name: Package debug APK
         run: >-
           "$QT_HOST_PATH/bin/androiddeployqt"
-          --input "$PWD/build/v6-android/android-winrisk_app-deployment-settings.json"
+          --input "$PWD/build/v6-android/native/android-winrisk_app-deployment-settings.json"
           --output "$PWD/build/v6-android/android-build"
           --apk "$PWD/WinRisk-android-arm64-v6.apk"
 

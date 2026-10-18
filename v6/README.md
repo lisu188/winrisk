@@ -1,6 +1,6 @@
 # WinRisk Qt v6
 
-This directory is the authoritative standalone build entry for the schema-v6 Qt/C++ migration.
+This directory is a standalone build entry for the schema-v6 Qt/C++ migration. It delegates to the same native target definitions as the repository-root build. Generated targets live in the `native/` subdirectory of the selected build directory so Qt generates QML cache paths from the canonical source tree on Windows as well as Unix.
 
 It builds:
 

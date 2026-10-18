@@ -176,6 +176,8 @@ public:
     static int tradeValue(int completedTrades);
 
 private:
+    friend struct GameEngineTestAccess;
+
     std::vector<Territory> territories_;
     std::vector<Continent> continents_;
     std::vector<Player> players_;
