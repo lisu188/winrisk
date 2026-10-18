@@ -4,13 +4,23 @@
 #include <string>
 #include <vector>
 
-#define private public
 #include "engine/GameEngine.hpp"
-#undef private
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+
+namespace winrisk {
+
+// Keep private-member declarations identical to the library, including MSVC name mangling.
+struct GameEngineTestAccess {
+    static bool runAiReinforcePhase(GameEngine& game) { return game.runAiReinforcePhase(); }
+    static double fieldScale(const GameEngine& game, int id) { return game.fieldScale(id); }
+    static int continentGoalFor(GameEngine& game, int id) { return game.continentGoalFor(id); }
+    static bool javaInteractivePlayer(const GameEngine& game, int id) { return game.javaInteractivePlayer(id); }
+};
+
+}
 
 using namespace winrisk;
 
@@ -132,10 +142,10 @@ int main() {
         GameEngine skynet;
         CHECK(normal.restore(neutralScaleSnapshot(false)));
         CHECK(skynet.restore(neutralScaleSnapshot(true)));
-        CHECK(skynet.javaInteractivePlayer(2));
-        CHECK(!skynet.javaInteractivePlayer(1));
-        const double normalScale = normal.fieldScale(0);
-        const double skynetScale = skynet.fieldScale(0);
+        CHECK(GameEngineTestAccess::javaInteractivePlayer(skynet, 2));
+        CHECK(!GameEngineTestAccess::javaInteractivePlayer(skynet, 1));
+        const double normalScale = GameEngineTestAccess::fieldScale(normal, 0);
+        const double skynetScale = GameEngineTestAccess::fieldScale(skynet, 0);
         CHECK(std::isfinite(normalScale));
         CHECK(std::isfinite(skynetScale));
         CHECK(skynetScale > normalScale);
@@ -149,7 +159,7 @@ int main() {
         std::vector<int> before;
         before.reserve(game.territories().size());
         for (const auto& territory : game.territories()) before.push_back(territory.armies);
-        CHECK(game.runAiReinforcePhase());
+        CHECK(GameEngineTestAccess::runAiReinforcePhase(game));
         CHECK(game.players()[0].reinforcements == 0);
         int changed = 0;
         int added = 0;
@@ -168,13 +178,13 @@ int main() {
         CHECK(game.restore(snapshot));
         const auto continents = GameEngine::makeWorldContinents();
         const auto& goal = continents.front();
-        CHECK(game.continentGoalFor(0) == goal.id);
+        CHECK(GameEngineTestAccess::continentGoalFor(game, 0) == goal.id);
 
         std::array<int, 3> before{};
         for (std::size_t i = 0; i < before.size(); ++i) {
             before[i] = game.territories()[static_cast<std::size_t>(goal.territories[i])].armies;
         }
-        CHECK(game.runAiReinforcePhase());
+        CHECK(GameEngineTestAccess::runAiReinforcePhase(game));
         for (std::size_t i = 0; i < before.size(); ++i) {
             CHECK(game.territories()[static_cast<std::size_t>(goal.territories[i])].armies == before[i] + 1);
         }

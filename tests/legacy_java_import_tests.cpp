@@ -71,7 +71,9 @@ QJsonObject baseGame(const QString& mode) {
 }
 
 QJsonObject player(int index, bool human) {
-    return test::basicPlayer(index, human);
+    QJsonObject object = test::basicPlayer(index, human);
+    object.insert("conqueredTerritoryThisTurn", index == 0);
+    return object;
 }
 
 void fillAllCards(QJsonObject& root, const std::set<int>& excluded, bool splitZones) {
