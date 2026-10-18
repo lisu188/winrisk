@@ -112,6 +112,7 @@ jobs:
           qt-cmake -S v6 -B build/v6-android -GNinja
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_TESTING=OFF
+          -DQT_ANDROID_DEPLOYMENT_TYPE=Debug
           -DANDROID_ABI=arm64-v8a
           -DANDROID_PLATFORM=android-28
           -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
@@ -121,11 +122,9 @@ jobs:
         run: cmake --build build/v6-android --target winrisk_app --parallel
 
       - name: Package debug APK
-        run: >-
-          "$QT_HOST_PATH/bin/androiddeployqt"
-          --input "$PWD/build/v6-android/native/android-winrisk_app-deployment-settings.json"
-          --output "$PWD/build/v6-android/android-build"
-          --apk "$PWD/WinRisk-android-arm64-v6.apk"
+        run: |
+          cmake --build build/v6-android --target apk --parallel
+          cmake -E copy build/v6-android/native/android-build/winrisk_app.apk WinRisk-android-arm64-v6.apk
 
       - uses: actions/upload-artifact@v4
         with:
