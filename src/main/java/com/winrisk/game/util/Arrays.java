@@ -14,11 +14,11 @@ public class Arrays {
     public static float avg(Integer[] tab) {
         validateAverageInput(tab);
 
-        int av = 0;
-        for (float element : tab) {
+        long av = 0;
+        for (int element : tab) {
             av += element;
         }
-        return av / (float) tab.length;
+        return (float) ((double) av / tab.length);
     }
 
     public static int indMax(float[] tab) {
