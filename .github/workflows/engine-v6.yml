@@ -24,6 +24,9 @@ on:
       - '.github/workflows/engine-v6.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   engine:
     runs-on: ubuntu-24.04
@@ -57,3 +60,4 @@ jobs:
               "${sources[@]}" "tests/${test}.cpp" -o "$test"
             "./$test"
           done
+

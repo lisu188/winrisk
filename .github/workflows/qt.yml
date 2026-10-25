@@ -32,6 +32,9 @@ on:
       - '.github/workflows/qt.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   desktop:
     name: Desktop ${{ matrix.os }} / Qt ${{ matrix.qt }}
@@ -180,3 +183,4 @@ jobs:
           name: WinRisk-webassembly
           path: WinRisk-web
           if-no-files-found: error
+
