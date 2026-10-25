@@ -50,6 +50,9 @@ on:
       - '.github/workflows/qt-v6.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   desktop:
     name: Desktop ${{ matrix.os }} / Qt ${{ matrix.qt }}
@@ -198,3 +201,4 @@ jobs:
           name: WinRisk-webassembly-v6
           path: WinRisk-web-v6
           if-no-files-found: error
+
