@@ -14,10 +14,8 @@ public class PointF implements Serializable {
     }
 
     public static float dist(PointF x, PointF y) {
-        float dist = 0;
-        dist += Math.pow(x.x - y.x, 2);
-        dist += Math.pow(x.y - y.y, 2);
-        dist = (float) Math.sqrt(dist);
-        return dist;
+        double dx = (double) x.x - y.x;
+        double dy = (double) x.y - y.y;
+        return (float) Math.hypot(dx, dy);
     }
 }
