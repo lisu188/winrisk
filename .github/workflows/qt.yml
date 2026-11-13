@@ -111,7 +111,7 @@ jobs:
           cmake --build build/android --target apk --parallel
           cmake -E copy build/android/android-build/winrisk_app.apk WinRisk-android-arm64.apk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: WinRisk-android-arm64
           path: WinRisk-android-arm64.apk
@@ -178,7 +178,7 @@ jobs:
           find build/wasm -maxdepth 2 -type f \( -name '*.html' -o -name '*.js' -o -name '*.wasm' -o -name '*.data' \) -exec cp {} WinRisk-web/ \;
           test -n "$(find WinRisk-web -type f -name '*.wasm' -print -quit)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: WinRisk-webassembly
           path: WinRisk-web
