@@ -31,7 +31,7 @@ jobs:
   engine:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build and run strict C++20 engine suites
         shell: bash
