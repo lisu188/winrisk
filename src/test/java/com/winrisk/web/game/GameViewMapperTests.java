@@ -1,6 +1,6 @@
 package com.winrisk.web.game;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.winrisk.game.data.GameMode;
 import com.winrisk.game.data.Params;
 import com.winrisk.game.view.Game;
@@ -34,7 +34,7 @@ public class GameViewMapperTests {
         assertTrue(view.hasBackgroundImage);
         assertNotNull(view.missionText);
 
-        String json = new ObjectMapper().writeValueAsString(view);
+        String json = JsonMapper.builder().build().writeValueAsString(view);
         assertTrue("view JSON must stay small (was " + json.length() + ")",
                 json.length() < 50_000);
         assertFalse("no image bytes in the view", json.contains("\"image\""));

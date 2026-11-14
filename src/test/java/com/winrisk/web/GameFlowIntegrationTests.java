@@ -4,10 +4,11 @@ import com.winrisk.web.api.dto.GameView;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.converter.MappingJackson2MessageConverter;
+import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * stream of views with increasing versions until control returns to the human.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureTestRestTemplate
 @TestPropertySource(properties = {
         "winrisk.ai-step-millis=1",
         "winrisk.saves-dir=build/it-saves",
@@ -54,7 +56,7 @@ class GameFlowIntegrationTests {
         String id = (String) created.getBody().get("id");
 
         WebSocketStompClient stomp = new WebSocketStompClient(new StandardWebSocketClient());
-        stomp.setMessageConverter(new MappingJackson2MessageConverter());
+        stomp.setMessageConverter(new JacksonJsonMessageConverter());
         BlockingQueue<GameView> frames = new LinkedBlockingQueue<>();
         StompSession session = stomp.connectAsync("ws://localhost:" + port + "/ws",
                 new StompSessionHandlerAdapter() {
